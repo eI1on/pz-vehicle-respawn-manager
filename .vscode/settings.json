@@ -1,0 +1,26 @@
+{
+    "Lua.workspace.library": [
+        "${addons}/umbrella/module/library",
+        "C:/Users/geote/ZomboidDEV/Workshop/pz-elyonlib",
+        "C:/Users/geote/ZomboidDEV/Workshop/zone-api-chucked",
+        "D:/SteamLibrary/steamapps/workshop/content/108600/3378285185/mods/StarlitLibrary"
+    ],
+    "Lua.runtime.version": "Lua 5.1",
+    "Lua.runtime.path": [
+        "?.lua",
+        "?/init.lua",
+        "server/?.lua"
+    ],
+    "Lua.completion.requireSeparator": "/",
+    "Lua.workspace.preloadFileSize": 800,
+    "Lua.runtime.builtin": {
+        "debug": "disable",
+        "io": "disable",
+        "package": "disable"
+    },
+    "Lua.workspace.checkThirdParty": false,
+    "Lua.diagnostics.globals": [
+        "require",
+        "Calendar"
+    ],
+}

@@ -1,0 +1,54 @@
+IGUI_EN = {
+
+    IGUI_VRM_Title = "Vehicle Respawn Manager",
+
+    IGUI_VRM_ContextMenu = "Vehicle Respawn Manager",
+
+    IGUI_VRM_Export = "Export",
+    IGUI_VRM_ExportSuccesful = "Zones exported succesfully to:\n%1\n\nOpen the file ?",
+    IGUI_VRM_Import = "Import",
+
+    IGUI_VRM_ZoneName = "Zone Name",
+
+    IGUI_VRM_AddZone = "Add Zone",
+    IGUI_VRM_RemoveZone = "Remove Selected",
+
+    IGUI_VRM_ZoneIsGlobal = "Zone is Global",
+    IGUI_VRM_ZoneIsBlacklist = "Zone is Blacklist",
+
+    IGUI_VRM_COORDS_ERROR = "Coords must be X1 < X2, Y1 < Y2",
+
+    IGUI_VRM_X1 = "x1:",
+    IGUI_VRM_Y1 = "y1:",
+    IGUI_VRM_X2 = "x2:",
+    IGUI_VRM_Y2 = "y2:",
+
+    IGUI_VRM_VehiclesCategories = "Categories",
+    IGUI_VRM_SpawnRates = "Spawn Rates",
+    IGUI_VRM_CategoryName = "Category Name",
+    IGUI_VRM_AddCategory = "Add Category",
+    IGUI_VRM_RemoveCategory = "Remove Selected",
+
+    IGUI_VRM_VehiclesAssigned = "Vehicles Assigned",
+    IGUI_VRM_VehicleScript = "Vehicle Script",
+    IGUI_VRM_VehicleScriptBatch = "Vehicle Scirpts (separated by ';')",
+    IGUI_VRM_AddVehicle = "Add Vehicle",
+    IGUI_VRM_BatchAddVehicle = "Batch Add Vehicles",
+    IGUI_VRM_RemoveVehicle = "Remove Selected",
+
+    IGUI_VRM_Blacklist = "Blacklisted Vehicles",
+    IGUI_VRM_AddBlacklist = "Add Vehicle",
+    IGUI_VRM_BatchAddBlacklist = "Batch Add Vehicles",
+    IGUI_VRM_RemoveBlacklist = "Remove Selected",
+
+    IGUI_VRM_DefaultCatForUnassignedVehicles = "Enable Default Category for Unassigned Vehicles",
+    IGUI_VRM_SetDefaultCat = "Set Default Category",
+    IGUI_VRM_CurrentDefaultCatForUnassignedVehicles = "Currently: %1",
+
+    IGUI_VRM_MaxVehiclesPerZone = "Maximum Vehicles Per Zone",
+
+    IGUI_VRM_EnableLogging = "Enable Logging",
+
+    IGUI_VRM_InvalidVehicleScript = "Invalid vehicle script(s). Ensure they are correct and use valid characters.",
+
+}

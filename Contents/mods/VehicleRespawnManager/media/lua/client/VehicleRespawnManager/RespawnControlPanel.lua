@@ -72,10 +72,6 @@ function ISAdminPanelUI:create()
     self:addChild(self.showVehicleRespawnManager);
 end
 
-Events.OnFillWorldObjectContextMenu.Remove(RespawnControlPanel.onFillWorldObjectContextMenu);
-Events.OnFillWorldObjectContextMenu.Add(RespawnControlPanel.onFillWorldObjectContextMenu);
-
-
 function RespawnControlPanel:new(x, y, width, height, player)
     local o = ISCollapsableWindowJoypad.new(self, x, y, width, height);
 

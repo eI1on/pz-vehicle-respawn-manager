@@ -2,5 +2,6 @@ name=Vehicle Respawn Manager [DEV Branch]
 poster=poster.png
 id=VehicleRespawnManager_DEV
 description=
+require=ElyonLib,StarlitLibrary
 tags=Build 41,Misc,Multiplayer,Interface
 versionMin=41.0

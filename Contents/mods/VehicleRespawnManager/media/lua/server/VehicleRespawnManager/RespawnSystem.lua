@@ -2,7 +2,8 @@ local Reflection = require("Starlit/utils/Reflection");
 local Globals = require("Starlit/Globals");
 
 local Logger = require("ElyonLib/Logger"):new("Vehicle Respawn Manager");
-local FileUtils = require("ElyonLib/FileUtils");
+
+if Globals.isClient then return; end
 
 local VehicleRespawnManager = require("VehicleRespawnManager/Shared");
 VehicleRespawnManager.RespawnSystem = {};
@@ -26,11 +27,12 @@ local rand = newrandom();
 -- Utility & Data Access
 -----------------------------------------------------
 
-local function getGMD()
+function VehicleRespawnManager.RespawnSystem.getGMD()
     local gmd = ModData.getOrCreate("VehicleRespawnManagerData");
     if not gmd.SpawnRequestsQueue then gmd.SpawnRequestsQueue = {}; end
     if not gmd.LocationPendingSpawns then gmd.LocationPendingSpawns = {}; end
     if not gmd.TimedSpawns then gmd.TimedSpawns = {}; end
+    if not gmd.Options then gmd.Options = {}; end
     return gmd;
 end
 
@@ -113,7 +115,19 @@ function VehicleRespawnManager.RespawnSystem.InitZones()
     VehicleRespawnManager.RespawnSystem.NonGlobalZones = NonGlobalZones;
 end
 
-Events.OnInitGlobalModData.Add(VehicleRespawnManager.RespawnSystem.InitZones);
+function VehicleRespawnManager.RespawnSystem.InitOptions()
+    local optionsVars = SandboxVars.VehicleRespawnManager;
+
+    if optionsVars then
+        local logLevel = optionsVars.enableLogging and "DEBUG" or "INFO";
+        Logger:setLogLevel(logLevel);
+    end
+end
+
+Events.OnInitGlobalModData.Add(function()
+    VehicleRespawnManager.RespawnSystem.InitZones();
+    VehicleRespawnManager.RespawnSystem.InitOptions();
+end);
 
 -----------------------------------------------------
 -- World Cell Zones Retrieval & Utility
@@ -508,7 +522,7 @@ end
 function VehicleRespawnManager.RespawnSystem.AttemptSpawnDetermined(vehicleScript, x, y, attempt, direction, zoneName,
                                                                     category)
     attempt = attempt or 0;
-    local gmd = getGMD();
+    local gmd = VehicleRespawnManager.RespawnSystem.getGMD();
     local success, reason = VehicleRespawnManager.RespawnSystem.SpawnVehicleAt(vehicleScript, x, y, direction);
     if not success then
         attempt = attempt + 1;
@@ -621,7 +635,7 @@ function VehicleRespawnManager.RespawnSystem.ProcessSingleRequest(req)
     if spawnCoords and spawnCoords.direction then direction = tostring(spawnCoords.direction); end
 
     if coordsType == "globalCoords" and spawnCoords and (spawnCoords.x and spawnCoords.y) then
-        local gmd = getGMD();
+        local gmd = VehicleRespawnManager.RespawnSystem.getGMD();
         local key = spawnCoords.x .. "_" .. spawnCoords.y;
         gmd.LocationPendingSpawns[key] = {
             vehicleScript = vehicleScript,
@@ -654,7 +668,7 @@ function VehicleRespawnManager.RespawnSystem.ProcessQueues()
     end
     VehicleRespawnManager.RespawnSystem.LastProcessTime = now;
 
-    local gmd = getGMD();
+    local gmd = VehicleRespawnManager.RespawnSystem.getGMD();
 
     if #gmd.SpawnRequestsQueue > 0 then
         local req = table.remove(gmd.SpawnRequestsQueue, 1);
@@ -721,7 +735,7 @@ Events.OnTick.Add(VehicleRespawnManager.RespawnSystem.ProcessQueues);
 
 -- On grid square load, try LocationPendingSpawns
 function VehicleRespawnManager.RespawnSystem.OnLoadGridsquare(square)
-    local gmd = getGMD();
+    local gmd = VehicleRespawnManager.RespawnSystem.getGMD();
     local key = square:getX() .. "_" .. square:getY();
     local toSpawn = gmd.LocationPendingSpawns[key];
     if toSpawn then
@@ -767,12 +781,12 @@ Events.LoadGridsquare.Add(VehicleRespawnManager.RespawnSystem.OnLoadGridsquare);
 -- Public API for queueing spawns
 -----------------------------------------------------
 function VehicleRespawnManager.RespawnSystem.QueueRandomVehicle()
-    local gmd = getGMD();
+    local gmd = VehicleRespawnManager.RespawnSystem.getGMD();
     table.insert(gmd.SpawnRequestsQueue, { type = "random" });
 end
 
 function VehicleRespawnManager.RespawnSystem.QueueFixedVehicle(scriptName)
-    local gmd = getGMD();
+    local gmd = VehicleRespawnManager.RespawnSystem.getGMD();
     table.insert(gmd.SpawnRequestsQueue, { type = "fixed", fixedScript = scriptName });
 end
 

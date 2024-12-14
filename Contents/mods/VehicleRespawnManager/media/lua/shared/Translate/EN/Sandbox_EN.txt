@@ -1,0 +1,7 @@
+Sandbox_EN = {
+
+    Sandbox_VehicleRespawnManager = "Vehicle Respawn Manager",
+    Sandbox_VehicleRespawnManager_enableLogging = "Enable Logging",
+    Sandbox_VehicleRespawnManager_enableLogging_tooltip = "Turn <SPACE> <RGB:1,0.8,0> ON </RGB> <SPACE> to enable detailed logging. When enabled, the mod records info about spawn events and system operations for troubleshooting and monitoring purposes.",
+
+}

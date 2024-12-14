@@ -1,3 +1,5 @@
+local Globals = require("Starlit/Globals");
+
 local Logger = require("ElyonLib/Logger"):new("Vehicle Respawn Manager");
 
 local VehicleRespawnManager = require("VehicleRespawnManager/Shared");
@@ -8,7 +10,7 @@ VehicleRespawnManager.Server.ServerCommands = {};
 -- PUSHING UPDATES TO CLIENTS
 --------------------------------------------------
 function VehicleRespawnManager.Server.PushUpdateToAll(zones)
-    if isServer() then
+    if Globals.isServer then
         sendServerCommand("VehicleRespawnManager", "LoadZones", zones);
     else
         VehicleRespawnManager.Zones = zones;
@@ -17,7 +19,7 @@ function VehicleRespawnManager.Server.PushUpdateToAll(zones)
 end
 
 function VehicleRespawnManager.Server.PushUpdateToPlayer(player, zones)
-    if isServer() then
+    if Globals.isServer then
         sendServerCommand(player, "VehicleRespawnManager", "LoadZones", zones);
     else
         VehicleRespawnManager.Zones = zones;
@@ -100,6 +102,53 @@ function VehicleRespawnManager.Server.ServerCommands.ImportZoneData(player, args
     for _, newZone in pairs(newZones) do table.insert(zones, newZone); end
 
     VehicleRespawnManager.Server.PushUpdateToPlayer(player, zones);
+end
+
+function VehicleRespawnManager.Server.ServerCommands.ExportRespawnSystemData(player, args)
+    sendServerCommand("VehicleRespawnManager", "ExportRespawnSystemData",
+        { data = VehicleRespawnManager.RespawnSystem.getGMD() });
+end
+
+function VehicleRespawnManager.Server.ServerCommands.SetLogLevel(player, args)
+    local level = args.level and args.level or "INFO";
+    Logger:setLogLevel(level);
+end
+
+--------------------------------------------------
+-- SERVER COMMAND HANDLER: QueueVehicle
+--------------------------------------------------
+function VehicleRespawnManager.Server.ServerCommands.QueueVehicle(player, args)
+    local queueType = args.type;
+    if queueType == "random" then
+        if not args.count then
+            VehicleRespawnManager.RespawnSystem.QueueRandomVehicle();
+        else
+            local count = tonumber(args.count);
+            if count and count > 0 then
+                for i = 1, count do
+                    VehicleRespawnManager.RespawnSystem.QueueRandomVehicle();
+                end
+            end
+        end
+    elseif queueType == "fixed" then
+        local scriptName = args.scriptName;
+        if not scriptName then
+            return;
+        end
+        if not VehicleRespawnManager.Shared.VehicleScripts[scriptName] then
+            return;
+        end
+        if not args.count then
+            VehicleRespawnManager.RespawnSystem.QueueFixedVehicle(scriptName);
+        else
+            local count = tonumber(args.count);
+            if count and count > 0 then
+                for i = 1, count do
+                    VehicleRespawnManager.RespawnSystem.QueueFixedVehicle(scriptName);
+                end
+            end
+        end
+    end
 end
 
 function VehicleRespawnManager.Server.onClientCommand(module, command, player, args)

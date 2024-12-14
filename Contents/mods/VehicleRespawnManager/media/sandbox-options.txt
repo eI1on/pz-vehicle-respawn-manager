@@ -1,0 +1,9 @@
+VERSION = 1,
+
+option VehicleRespawnManager.enableLogging
+{
+    type = boolean,
+    default = true,
+    page = VehicleRespawnManager,
+    translation = VehicleRespawnManager_enableLogging,
+}

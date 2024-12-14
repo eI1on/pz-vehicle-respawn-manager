@@ -1,5 +1,4 @@
-local Logger = require("ElyonLib/Logger"):new("Vehicle Respawn Manager");
-local FileUtils = require("ElyonLib/FileUtils");
+local Globals = require("Starlit/Globals");
 
 local VehicleRespawnManager = {};
 VehicleRespawnManager.Shared = {};
@@ -19,9 +18,9 @@ Events.OnInitGlobalModData.Add(VehicleRespawnManager.Shared.InitVehicleScripts)
 
 function VehicleRespawnManager.Shared.RequestZones()
     if not VehicleRespawnManager.Zones then
-        if isClient() then
+        if Globals.isClient then
             sendClientCommand("VehicleRespawnManager", "LoadZones", {});
-        elseif isServer() or (not isClient() and not isServer()) then
+        else
             VehicleRespawnManager.Zones = ModData.getOrCreate("VehicleRespawnManagerZones");
         end
     end

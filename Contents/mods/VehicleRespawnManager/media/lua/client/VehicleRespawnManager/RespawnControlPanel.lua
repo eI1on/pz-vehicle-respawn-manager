@@ -242,7 +242,6 @@ function RespawnControlPanel:createChildren()
     self:addBlacklistedVehiclesButtons();
 
     self:addDefaultCategoryOptions();
-    self:addLoggingOptions();
 
     self:populateElements();
 end
@@ -413,8 +412,10 @@ end
 
 function RespawnControlPanel:populateZoneComboBox()
     self.zoneNameComboBox:clear();
-    for i = 1, #self.vehicleRespawnZones do
-        self.zoneNameComboBox:addOptionWithData(self.vehicleRespawnZones[i].name, self.vehicleRespawnZones[i]);
+    if self.vehicleRespawnZones and #self.vehicleRespawnZones > 0 then
+        for i = 1, #self.vehicleRespawnZones do
+            self.zoneNameComboBox:addOptionWithData(self.vehicleRespawnZones[i].name, self.vehicleRespawnZones[i]);
+        end
     end
 end
 
@@ -796,12 +797,6 @@ function RespawnControlPanel:addDefaultCategoryOptions()
     self.maxVehiclesPerZoneInput.onTextChange = self.onMaxVehiclesPerZoneInputChange;
     self.maxVehiclesPerZoneInput:setHeight(25);
     self.maxVehiclesPerZoneInput:setOnlyNumbers(true);
-end
-
-function RespawnControlPanel:addLoggingOptions()
-    local padding = 10;
-    self.enableLoggingTickBox = self:createTickBox(padding, self.maxVehiclesPerZoneLabel:getBottom() + 2 * padding,
-        { getText("IGUI_VRM_EnableLogging") });
 end
 
 function RespawnControlPanel:onResize()

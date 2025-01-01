@@ -1,8 +1,10 @@
 IGUI_EN = {
 
-    IGUI_VRM_Title = "Vehicle Respawn Manager",
+    
+    IGUI_VRM_Add = "Add",
+    IGUI_VRM_Cancel = "Cancel",
 
-    IGUI_VRM_ContextMenu = "Vehicle Respawn Manager",
+    IGUI_VRM_Title = "Vehicle Respawn Manager",
 
     IGUI_VRM_Export = "Export",
     IGUI_VRM_ExportSuccesful = "Zones exported succesfully to:\n%1\n\nOpen the file ?",
@@ -10,11 +12,18 @@ IGUI_EN = {
 
     IGUI_VRM_ZoneName = "Zone Name",
 
+    IGUI_VRM_ZoneCombobox_tooltip = "This dropdown contains the list of all available zone. To modify a zone name, click on the name you wish to change and press Enter after editing. Note: The zone name cannot start with a number.",
+
     IGUI_VRM_AddZone = "Add Zone",
     IGUI_VRM_RemoveZone = "Remove Selected",
 
+    IGUI_VRM_AddZone_tooltip = "Click to add a new zone to the list.",
+    IGUI_VRM_RemoveZone_tooltip = "Click to remove the selected zone from the list.",
+
     IGUI_VRM_ZoneIsGlobal = "Zone is Global",
     IGUI_VRM_ZoneIsBlacklist = "Zone is Blacklist",
+
+    IGUI_VRM_ZoneOptions_tooltip =  "For Global Zones the coordinates will not be taken into consideration, meaning will be applied to the entire map. <BR> For Blacklist Zones coordinates are mandatory. In these areas vehicles do NOT spawn at all. <BR> A zone cannot be both Global and Blacklist at the same time.",
 
     IGUI_VRM_COORDS_ERROR = "Coords must be X1 < X2, Y1 < Y2",
 
@@ -23,32 +32,56 @@ IGUI_EN = {
     IGUI_VRM_X2 = "x2:",
     IGUI_VRM_Y2 = "y2:",
 
+    IGUI_VRM_CoordsInputs_tooltip = "Coordinates for the zone's area. <BR> The first set (X1, Y1) defines the top corner (North-West), and the second set (X2, Y2) defines the bottom corner (South-East). <BR> These coordinates are mandatory for non-global and blacklist zones. For global zones, coordinates are excluded.",
+
     IGUI_VRM_VehiclesCategories = "Categories",
     IGUI_VRM_SpawnRates = "Spawn Rates",
     IGUI_VRM_CategoryName = "Category Name",
     IGUI_VRM_AddCategory = "Add Category",
     IGUI_VRM_RemoveCategory = "Remove Selected",
 
+    IGUI_VRM_AddCategory_tooltip  = "Add a new vehicle category to the selected zone. You can define the name, spawn rate, and vehicles assigned to this category.",
+    IGUI_VRM_RemoveCategory_tooltip  = "Remove the selected vehicle category from the selected zone.",
+
     IGUI_VRM_VehiclesAssigned = "Vehicles Assigned",
     IGUI_VRM_VehicleScript = "Vehicle Script",
-    IGUI_VRM_VehicleScriptBatch = "Vehicle Scirpts (separated by ';')",
+    IGUI_VRM_VehicleScriptBatch = "Vehicle Scripts (separated by ';')",
+
     IGUI_VRM_AddVehicle = "Add Vehicle",
     IGUI_VRM_BatchAddVehicle = "Batch Add Vehicles",
     IGUI_VRM_RemoveVehicle = "Remove Selected",
+
+    IGUI_VRM_AddVehicle_tooltip = "Add vehicle(s) to the selected vehicle category in the zone. When a category is chosen based on its rate, a vehicle is chosen randomly. All vehicles within a category have an equal chance of being selected for spawning.",
+    IGUI_VRM_RemoveVehicle_tooltip = "Remove the selected vehicle from the assigned vehicles list of the selected category in the zone.",
 
     IGUI_VRM_Blacklist = "Blacklisted Vehicles",
     IGUI_VRM_AddBlacklist = "Add Vehicle",
     IGUI_VRM_BatchAddBlacklist = "Batch Add Vehicles",
     IGUI_VRM_RemoveBlacklist = "Remove Selected",
 
+    IGUI_VRM_AddBlacklist_tooltip = "Add a vehicle(s) to the blacklist for the selected zone. Vehicles in the blacklist will not spawn in the zone. <BR> This feature becomes especially useful if 'Enable Default Category for Unassigned Vehicles' is enabled. You can blacklist specific vehicles you don't want to spawn in the zone, without needing to manually assign every vehicle to a category. Just blacklist the unwanted vehicles and they will be excluded from spawning.",
+    IGUI_VRM_RemoveBlacklist_tooltip = "Remove a vehicle from the blacklist for the selected zone.",
+
     IGUI_VRM_DefaultCatForUnassignedVehicles = "Enable Default Category for Unassigned Vehicles",
     IGUI_VRM_SetDefaultCat = "Set Default Category",
     IGUI_VRM_CurrentDefaultCatForUnassignedVehicles = "Currently: %1",
 
+    IGUI_VRM_DefaultCatForUnassignedVehicles_tooltip = "Enable the use of a Default Category for Unassigned Vehicles to any of the selected zone categories.",
+    IGUI_VRM_SetDefaultCat_tooltip = "Set the default category for unassigned vehicles. Vehicles without an assigned category will be placed in this default category by default.",
+
     IGUI_VRM_MaxVehiclesPerZone = "Maximum Vehicles Per Zone",
 
-    IGUI_VRM_EnableLogging = "Enable Logging",
+    IGUI_VRM_ManualVehicleSpawn = "Manual Vehicle Spawn",
+    IGUI_VRM_SpawnMethod = "Vehicle Script Method",
+    IGUI_VRM_SpawnMethodRandom = "Random",
+    IGUI_VRM_SpawnMethodFixed = "Fixed",
+    IGUI_VRM_SpawnCount = "Spawn Count",
+    IGUI_VRM_SpawnVehicleScript = "Vehicle Script",
+    IGUI_VRM_SpawnVehicle = "Spawn Vehicle(s)",
+
+    IGUI_VRM_SpawnMethod_tooltip =  "Select 'Random' for a random vehicle script spawn or 'Fixed' to spawn a specific vehicle based on the vehicle script provided.",
 
     IGUI_VRM_InvalidVehicleScript = "Invalid vehicle script(s). Ensure they are correct and use valid characters.",
+    IGUI_VRM_WriteVehicleScript = "You need to write a valid vehicle script in the vehicle script text box.",
 
 }

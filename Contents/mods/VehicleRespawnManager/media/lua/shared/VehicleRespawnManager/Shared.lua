@@ -17,12 +17,10 @@ Events.OnInitGlobalModData.Add(VehicleRespawnManager.Shared.InitVehicleScripts)
 
 
 function VehicleRespawnManager.Shared.RequestZones()
-    if not VehicleRespawnManager.Zones then
-        if Globals.isClient then
-            sendClientCommand("VehicleRespawnManager", "LoadZones", {});
-        else
-            VehicleRespawnManager.Zones = ModData.getOrCreate("VehicleRespawnManagerZones");
-        end
+    if Globals.isClient then
+        sendClientCommand("VehicleRespawnManager", "LoadZones", {});
+    else
+        VehicleRespawnManager.Zones = ModData.getOrCreate("VehicleRespawnManagerZones");
     end
     return VehicleRespawnManager.Zones;
 end

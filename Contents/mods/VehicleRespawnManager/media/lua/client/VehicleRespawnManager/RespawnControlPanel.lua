@@ -48,6 +48,7 @@ end
 
 local ISDebugMenu_setupButtons = ISDebugMenu.setupButtons;
 function ISDebugMenu:setupButtons()
+    sendClientCommand("VehicleRespawnManager", "LoadZones", {});
     self:addButtonInfo("Vehicle Respawn Manager", function() RespawnControlPanel.openPanel() end, "MAIN");
     ISDebugMenu_setupButtons(self);
 end
@@ -62,6 +63,8 @@ function ISAdminPanelUI:create()
 
     local lastButton = self.children[self.IDMax - 1];
     lastButton = lastButton.internal == "CANCEL" and self.children[self.IDMax - 2] or lastButton;
+
+    sendClientCommand("VehicleRespawnManager", "LoadZones", {});
 
     self.showVehicleRespawnManager = ISButton:new(lastButton.x, lastButton.y + btnHgt + btnGapY, btnWid, btnHgt,
         "Vehicle Respawn Manager", self, RespawnControlPanel.openPanel);
@@ -83,8 +86,6 @@ function RespawnControlPanel:new(x, y, width, height, player)
     o.minimumHeight       = 650;
 
     o.vehicleRespawnZones = VehicleRespawnManager.Shared.RequestZones();
-
-    o.sliders             = {};
 
     return o;
 end
@@ -120,6 +121,11 @@ function RespawnControlPanel:setupCoordinateInputs(padding)
         getText("IGUI_VRM_X2"), "x2");
     self.y2Label, self.y2Input = self:setupCoordinateField(self:getWidth() * 0.75, self.x1Label:getBottom() + halfPadding,
         getText("IGUI_VRM_Y2"), "y2");
+
+    self.x1Input.tooltip = getText("IGUI_VRM_CoordsInputs_tooltip");
+    self.y1Input.tooltip = getText("IGUI_VRM_CoordsInputs_tooltip");
+    self.x2Input.tooltip = getText("IGUI_VRM_CoordsInputs_tooltip");
+    self.y2Input.tooltip = getText("IGUI_VRM_CoordsInputs_tooltip");
 end
 
 function RespawnControlPanel:setupCoordinateField(x, y, labelText, coordType)
@@ -138,6 +144,9 @@ function RespawnControlPanel:setupZoneNameComboBox(th, padding)
     self.zoneNameComboBox.onChange = self.onChangeZoneNameBox;
     self.zoneNameComboBox.onMouseUp = self.onMouseUpZoneNameBox;
     self.zoneNameComboBox.target = self;
+    local map = {};
+    map["defaultTooltip"] = getText("IGUI_VRM_ZoneCombobox_tooltip");
+    self.zoneNameComboBox:setToolTipMap(map);
 
     local buttonWidth = (self.zoneNameComboBox:getWidth() - padding) / 2;
     self.addZoneButton = self:createButton(
@@ -145,11 +154,14 @@ function RespawnControlPanel:setupZoneNameComboBox(th, padding)
         getText("IGUI_VRM_AddZone"), self.onAddZone
     );
     self.addZoneButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.addZoneButton.tooltip = getText("IGUI_VRM_AddZone_tooltip");
+
     self.removeZoneButton = self:createButton(
         self.addZoneButton:getRight() + padding, self.addZoneButton:getY(),
         buttonWidth, 25, getText("IGUI_VRM_RemoveZone"), self.onRemoveZone
     );
     self.removeZoneButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.removeZoneButton.tooltip = getText("IGUI_VRM_RemoveZone_tooltip");
 end
 
 function RespawnControlPanel:createChildren()
@@ -166,6 +178,7 @@ function RespawnControlPanel:createChildren()
     );
     self.zoneOptionsTickBox.changeOptionTarget = self;
     self.zoneOptionsTickBox.changeOptionMethod = self.onTickBoxZoneOptions;
+    self.zoneOptionsTickBox.tooltip = getText("IGUI_VRM_ZoneOptions_tooltip");
 
     self:setupCoordinateInputs(padding);
 
@@ -243,6 +256,8 @@ function RespawnControlPanel:createChildren()
 
     self:addDefaultCategoryOptions();
 
+    self:addManualVehicleSpawn();
+
     self:populateElements();
 end
 
@@ -255,6 +270,16 @@ function RespawnControlPanel:prerender()
             self:populateElements();
         end
     end
+end
+
+function RespawnControlPanel:render()
+    self:drawRectBorder(10, self.maxVehiclesPerZoneLabel:getBottom() + 3 * 10,
+        self.spawnVehicleScriptLabel:getRight() + 10,
+        (self.spawnManualVehicleButton:getBottom() + 10) - (self.maxVehiclesPerZoneLabel:getBottom() + 3 * 10),
+        0.5, 1.0, 1.0, 1.0
+    );
+
+    ISCollapsableWindowJoypad.render(self);
 end
 
 function RespawnControlPanel:getSelectedZoneZoneIdx()
@@ -271,7 +296,6 @@ function RespawnControlPanel:getSelectedZoneData()
 end
 
 function RespawnControlPanel:populateElements()
-    sendClientCommand("VehicleRespawnManager", "LoadZones", {});
     self.vehicleRespawnZones = VehicleRespawnManager.Shared.RequestZones();
 
     self:populateZoneComboBox();
@@ -285,6 +309,20 @@ function RespawnControlPanel:populateElements()
         self.zoneOptionsTickBox.enable = true;
         self.zoneOptionsTickBox.selected[1] = zoneData.isGlobalZone;
         self.zoneOptionsTickBox.selected[2] = zoneData.isBlacklistZone;
+
+        local optionNames = {
+            getText("IGUI_VRM_ZoneIsGlobal"),
+            getText("IGUI_VRM_ZoneIsBlacklist")
+        }
+
+        if zoneData.isGlobalZone then
+            self.zoneOptionsTickBox:disableOption(optionNames[2], true)
+        elseif zoneData.isBlacklistZone then
+            self.zoneOptionsTickBox:disableOption(optionNames[1], true)
+        else
+            self.zoneOptionsTickBox:disableOption(optionNames[1], false)
+            self.zoneOptionsTickBox:disableOption(optionNames[2], false)
+        end
 
         self.x1Input:setEditable(true);
         self.x1Input:setSelectable(true);
@@ -318,6 +356,13 @@ function RespawnControlPanel:populateElements()
         self.zoneOptionsTickBox.enable = false;
         self.zoneOptionsTickBox.selected[1] = false;
         self.zoneOptionsTickBox.selected[2] = false;
+
+        local optionNames = {
+            getText("IGUI_VRM_ZoneIsGlobal"),
+            getText("IGUI_VRM_ZoneIsBlacklist")
+        };
+        self.zoneOptionsTickBox:disableOption(optionNames[1], false);
+        self.zoneOptionsTickBox:disableOption(optionNames[2], false);
 
         self.x1Input:setEditable(false);
         self.x1Input:setSelectable(false);
@@ -542,7 +587,7 @@ function RespawnControlPanel:onVehiclesCategoriesListMouseDown(x, y)
 end
 
 function RespawnControlPanel:onVehiclesCategoriesListmousedown(target, item)
-    self:populateVehiclesAssignedList(item)
+    self:populateVehiclesAssignedList(item);
 end
 
 function RespawnControlPanel:onVehiclesCategoriesListMouseMove(dx, dy)
@@ -712,12 +757,14 @@ function RespawnControlPanel:addVehicleCategoryButtons()
         self.onAddCategoryModal
     );
     self.addCategoryButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.addCategoryButton.tooltip = getText("IGUI_VRM_AddCategory_tooltip");
 
     self.removeCategoryButton = self:createButton(self.addCategoryButton:getRight() + 10,
         self.vehiclesCategoriesList:getBottom() + 10, buttonWidth, bttnHeight, getText("IGUI_VRM_RemoveCategory"),
         self.onRemoveCategory
     );
     self.removeCategoryButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.removeCategoryButton.tooltip = getText("IGUI_VRM_RemoveCategory_tooltip");
 end
 
 function RespawnControlPanel:addVehicleAssignmentButtons()
@@ -730,18 +777,21 @@ function RespawnControlPanel:addVehicleAssignmentButtons()
         self.onAddVehicleModal
     );
     self.addVehicleButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.addVehicleButton.tooltip = getText("IGUI_VRM_AddVehicle_tooltip");
 
     self.addBatchVehiclesButton = self:createButton(self.addVehicleButton:getX(),
         self.addVehicleButton:getBottom() + padding, buttonWidth, bttnHeight, getText("IGUI_VRM_BatchAddVehicle"),
         self.onAddBatchVehicleModal
     );
     self.addBatchVehiclesButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.addBatchVehiclesButton.tooltip = getText("IGUI_VRM_AddVehicle_tooltip");
 
     self.removeVehicleButton = self:createButton(self.addVehicleButton:getRight() + padding,
         self.vehiclesAssignedList:getBottom() + padding, buttonWidth, bttnHeight, getText("IGUI_VRM_RemoveVehicle"),
         self.onRemoveVehicle
     );
     self.removeVehicleButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.removeVehicleButton.tooltip = getText("IGUI_VRM_RemoveVehicle_tooltip");
 end
 
 function RespawnControlPanel:addBlacklistedVehiclesButtons()
@@ -753,20 +803,24 @@ function RespawnControlPanel:addBlacklistedVehiclesButtons()
         self.blacklistedVehiclesList:getBottom() + padding, buttonWidth, bttnHeight, getText("IGUI_VRM_AddBlacklist"),
         self.onAddBlacklistVehicleModal);
     self.addBlacklistVehicleButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.addBlacklistVehicleButton.tooltip = getText("IGUI_VRM_AddBlacklist_tooltip");
 
     self.addBatchBlacklistVehiclesButton = self:createButton(self.addBlacklistVehicleButton:getX(),
         self.addBlacklistVehicleButton:getBottom() + padding, buttonWidth, bttnHeight,
         getText("IGUI_VRM_BatchAddBlacklist"), self.onAddBatchBlacklistVehicleModal);
     self.addBatchBlacklistVehiclesButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.addBatchBlacklistVehiclesButton.tooltip = getText("IGUI_VRM_AddBlacklist_tooltip");
 
     self.removeBlacklistVehicleButton = self:createButton(self.addBlacklistVehicleButton:getRight() + padding,
         self.blacklistedVehiclesList:getBottom() + padding, buttonWidth, bttnHeight, getText("IGUI_VRM_RemoveBlacklist"),
         self.onRemoveBlacklistVehicle);
     self.removeBlacklistVehicleButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.removeBlacklistVehicleButton.tooltip = getText("IGUI_VRM_RemoveBlacklist_tooltip");
 end
 
 function RespawnControlPanel:addDefaultCategoryOptions()
     local padding = 10;
+    local buttonWidth = self.vehiclesCategoriesList:getWidth() / 4;
     local bttnHeight = 25;
 
     self.defaultCatUnassignedVehiclesTickBox = self:createTickBox(padding, self.addCategoryButton:getBottom() + 2 *
@@ -774,12 +828,14 @@ function RespawnControlPanel:addDefaultCategoryOptions()
     );
     self.defaultCatUnassignedVehiclesTickBox.changeOptionTarget = self;
     self.defaultCatUnassignedVehiclesTickBox.changeOptionMethod = self.onTickBoxDefaultCatUnassignedVehicles;
+    self.defaultCatUnassignedVehiclesTickBox.tooltip = getText("IGUI_VRM_DefaultCatForUnassignedVehicles_tooltip");
 
     self.setDefaultCategoryButton = self:createButton(padding,
-        self.defaultCatUnassignedVehiclesTickBox:getBottom() + padding, 100, bttnHeight,
+        self.defaultCatUnassignedVehiclesTickBox:getBottom() + padding, buttonWidth, bttnHeight,
         getText("IGUI_VRM_SetDefaultCat"), self.onSetDefaultCategory
     );
     self.setDefaultCategoryButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+    self.setDefaultCategoryButton.tooltip = getText("IGUI_VRM_SetDefaultCat_tooltip");
 
     self.currentDefaultCategoryLabel = self:createLabel(self.setDefaultCategoryButton:getRight() + padding,
         self.setDefaultCategoryButton:getY(), getText("IGUI_VRM_CurrentDefaultCatForUnassignedVehicles", "None")
@@ -797,6 +853,132 @@ function RespawnControlPanel:addDefaultCategoryOptions()
     self.maxVehiclesPerZoneInput.onTextChange = self.onMaxVehiclesPerZoneInputChange;
     self.maxVehiclesPerZoneInput:setHeight(25);
     self.maxVehiclesPerZoneInput:setOnlyNumbers(true);
+end
+
+function RespawnControlPanel:addManualVehicleSpawn()
+    local padding = 10;
+    local bttnHeight = 25;
+
+    self.manualVehicleSpawnLabel = self:createLabel(2 * padding, self.maxVehiclesPerZoneLabel:getBottom() + 2 * padding,
+        getText("IGUI_VRM_ManualVehicleSpawn"));
+    self.manualVehicleSpawnLabel.backgroundColor = { r = 0, g = 0, b = 0, a = 1 };
+
+
+    self.vehicleSpawnMethodLabel = self:createLabel(3 * padding, self.manualVehicleSpawnLabel:getBottom() + padding,
+        getText("IGUI_VRM_SpawnMethod"));
+    self.vehicleSpawnMethodLabel.font = UIFont.Small;
+    self.vehicleSpawnMethodLabel:setWidth(getTextManager():MeasureStringX(UIFont.Small, getText("IGUI_VRM_SpawnMethod")));
+
+    self.vehicleSpawnMethodRadioBttn = ISRadioButtons:new(3 * padding,
+        self.vehicleSpawnMethodLabel:getBottom() + padding / 2,
+        self.vehicleSpawnMethodLabel:getWidth(), 20, self, self.onChangeVehicleSpawnMethod);
+    self.vehicleSpawnMethodRadioBttn.choicesColor = { r = 1, g = 1, b = 1, a = 1 };
+    self.vehicleSpawnMethodRadioBttn:initialise();
+    self.vehicleSpawnMethodRadioBttn:instantiate();
+    self.vehicleSpawnMethodRadioBttn.autoWidth = true;
+    self:addChild(self.vehicleSpawnMethodRadioBttn);
+    self.vehicleSpawnMethodRadioBttn:addOption(getText("IGUI_VRM_SpawnMethodRandom"));
+    self.vehicleSpawnMethodRadioBttn:addOption(getText("IGUI_VRM_SpawnMethodFixed"));
+    self.vehicleSpawnMethodRadioBttn:setSelected(1);
+    self.vehicleSpawnMethodRadioBttn.tooltip = getText("IGUI_VRM_SpawnMethod_tooltip");
+
+
+    self.spawnCountLabel = self:createLabel(self.vehicleSpawnMethodLabel:getRight() + padding,
+        self.vehicleSpawnMethodLabel:getY(),
+        getText("IGUI_VRM_SpawnCount"));
+    self.spawnCountLabel.font = UIFont.Small;
+    self.spawnCountLabel:setWidth(getTextManager():MeasureStringX(UIFont.Small, getText("IGUI_VRM_SpawnCount")));
+
+    self.spawnCountInput = self:createTextInput(self.spawnCountLabel:getX(),
+        self.vehicleSpawnMethodRadioBttn:getY()
+    );
+    self.spawnCountInput:setWidth(self.spawnCountLabel:getWidth());
+    self.spawnCountInput.onTextChange = function()
+
+    end;
+    self.spawnCountInput:setText("1");
+    self.spawnCountInput:setHeight(20);
+    self.spawnCountInput:setOnlyNumbers(true);
+
+
+
+    self.spawnVehicleScriptLabel = self:createLabel(self.spawnCountLabel:getRight() + padding,
+        self.spawnCountLabel:getY(), getText("IGUI_VRM_SpawnVehicleScript"));
+    self.spawnVehicleScriptLabel.font = UIFont.Small;
+    self.spawnVehicleScriptLabel:setWidth(getTextManager():MeasureStringX(UIFont.Small,
+        getText("IGUI_VRM_SpawnVehicleScript")));
+
+    self.spawnVehicleInput = self:createTextInput(self.spawnVehicleScriptLabel:getX(),
+        self.spawnVehicleScriptLabel:getBottom() + padding / 2
+    );
+    self.spawnVehicleInput:setWidth(self.spawnVehicleScriptLabel:getWidth());
+    self.spawnVehicleInput.onTextChange = function()
+        local text = self.spawnVehicleInput:getInternalText():trim();
+
+        local isValid = true;
+        isValid = VehicleRespawnManager.Shared.VehicleScripts[text] and not string.match(text, "[^%w%._%-]");
+
+        if not isValid then
+            self.spawnManualVehicleButton:setEnable(false);
+            self.spawnManualVehicleButton.tooltip = getText("IGUI_VRM_InvalidVehicleScript");
+            return;
+        else
+            self.spawnManualVehicleButton:setEnable(true);
+            self.spawnManualVehicleButton.tooltip = nil;
+        end
+    end;
+    self.spawnVehicleInput:setText("");
+    self.spawnVehicleInput:setEditable(false);
+    self.spawnVehicleInput:setSelectable(false);
+    self.spawnVehicleInput:setHeight(20);
+    self.spawnVehicleInput:setOnlyNumbers(false);
+
+    self.spawnManualVehicleButton = self:createButton(2 * padding,
+        self.vehicleSpawnMethodRadioBttn:getBottom() + padding, self.vehiclesCategoriesList:getWidth() / 4, bttnHeight,
+        getText("IGUI_VRM_SpawnVehicle"), self.onSpawnVehicles
+    );
+    self.spawnManualVehicleButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+end
+
+function RespawnControlPanel:onSpawnVehicles()
+    local spawnMethod = nil;
+    if self.vehicleSpawnMethodRadioBttn:isSelected(1) then
+        spawnMethod = "random";
+    elseif self.vehicleSpawnMethodRadioBttn:isSelected(2) then
+        spawnMethod = "fixed";
+    end
+
+    local vehicleCount = self.spawnCountInput:getInternalText();
+    vehicleCount = vehicleCount and tonumber(vehicleCount) or 1;
+
+    local vehicleScriptName = nil;
+    if spawnMethod == "fixed" then
+        vehicleScriptName = self.spawnVehicleInput:getInternalText():trim();
+    end
+
+    sendClientCommand("VehicleRespawnManager", "QueueVehicle",
+        {
+            type = spawnMethod,
+            count = vehicleCount,
+            scriptName = vehicleScriptName
+        }
+    );
+end
+
+function RespawnControlPanel:onChangeVehicleSpawnMethod(buttons, index)
+    if index == 1 then
+        self.spawnVehicleInput:setText("");
+        self.spawnVehicleInput:setEditable(false);
+        self.spawnVehicleInput:setSelectable(false);
+        self.spawnManualVehicleButton:setEnable(true);
+        self.spawnManualVehicleButton.tooltip = "";
+    elseif index == 2 then
+        self.spawnVehicleInput:setText("");
+        self.spawnVehicleInput:setEditable(true);
+        self.spawnVehicleInput:setSelectable(true);
+        self.spawnManualVehicleButton:setEnable(false);
+        self.spawnManualVehicleButton.tooltip = getText("IGUI_VRM_WriteVehicleScript");
+    end
 end
 
 function RespawnControlPanel:onResize()
@@ -856,6 +1038,10 @@ function RespawnControlPanel:onResize()
     self.removeCategoryButton:setX(self.addCategoryButton:getRight() + padding);
 
 
+    self.setDefaultCategoryButton:setWidth(buttonWidth);
+    self.currentDefaultCategoryLabel:setX(self.setDefaultCategoryButton:getRight() + padding);
+
+
     buttonWidth = (self.vehiclesAssignedList:getWidth() - padding) / 2;
 
     self.addVehicleButton:setWidth(buttonWidth);
@@ -907,6 +1093,10 @@ function RespawnControlPanel:onMouseUpZoneNameBox(x, y)
 
     self.editor.onCommandEntered = function(self)
         local selectedValue = self:getInternalText():trim();
+        selectedValue = tostring(selectedValue);
+
+        if string.match(selectedValue, "^[0-9]") then return; end
+
         self:setText(selectedValue);
 
         sendClientCommand("VehicleRespawnManager", "EditZoneData",
@@ -917,6 +1107,7 @@ function RespawnControlPanel:onMouseUpZoneNameBox(x, y)
             }
         );
         self.parentCombo:forceClick();
+        self.parentCombo.parent.refresh = 3;
     end;
 
     self.editor.onOtherKey = function(self, key)
@@ -928,6 +1119,10 @@ function RespawnControlPanel:onMouseUpZoneNameBox(x, y)
             self.parentCombo:hidePopup();
 
             local selectedValue = self:getInternalText():trim();
+            selectedValue = tostring(selectedValue);
+
+            if string.match(selectedValue, "^[0-9]") then return; end
+
             self:setText(selectedValue);
 
             sendClientCommand("VehicleRespawnManager", "EditZoneData",
@@ -939,6 +1134,7 @@ function RespawnControlPanel:onMouseUpZoneNameBox(x, y)
             );
 
             self.parentCombo:forceClick();
+            self.parentCombo.parent.refresh = 3;
         end
     end;
 
@@ -946,13 +1142,30 @@ function RespawnControlPanel:onMouseUpZoneNameBox(x, y)
 end
 
 function RespawnControlPanel:onTickBoxZoneOptions(index, selected)
-    sendClientCommand("VehicleRespawnManager", "EditZoneData",
-        {
+    local otherIndex = index == 1 and 2 or 1;
+    local optionNames = {
+        getText("IGUI_VRM_ZoneIsGlobal"),
+        getText("IGUI_VRM_ZoneIsBlacklist")
+    };
+
+    if selected then
+        self.zoneOptionsTickBox.selected[otherIndex] = false;
+        self.zoneOptionsTickBox:disableOption(optionNames[otherIndex], true);
+
+        sendClientCommand("VehicleRespawnManager", "EditZoneData", {
             selectedIdx = self:getSelectedZoneZoneIdx(),
-            newKey = index == 1 and "isGlobalZone" or "isBlacklistZone",
-            newValue = selected
-        }
-    );
+            newKey = otherIndex == 1 and "isGlobalZone" or "isBlacklistZone",
+            newValue = false
+        });
+    else
+        self.zoneOptionsTickBox:disableOption(optionNames[otherIndex], false);
+    end
+
+    sendClientCommand("VehicleRespawnManager", "EditZoneData", {
+        selectedIdx = self:getSelectedZoneZoneIdx(),
+        newKey = index == 1 and "isGlobalZone" or "isBlacklistZone",
+        newValue = selected
+    });
 end
 
 function RespawnControlPanel:onCoordsInputChange()
@@ -1143,49 +1356,49 @@ function RespawnControlPanel:onAddCategoryModal()
 end
 
 function RespawnControlPanel:onAddCategory(target)
-    if target.internal == "OK" then
-        local text = target.parent.entry:getText();
-        local zoneData = self:getSelectedZoneData();
+    if target.internal ~= "OK" then return; end
 
-        if not zoneData then return; end
+    local text = target.parent.entry:getText();
+    local zoneData = self:getSelectedZoneData();
 
-        zoneData.highestCategoryKey = (zoneData.highestCategoryKey or 0) + 1;
+    if not zoneData then return; end
 
-        local nextKey = tostring(zoneData.highestCategoryKey);
-        self.vehiclesCategoriesList:addItem(text, {
-            key = nextKey,
-            vehicles = {},
-            spawnRate = 0
-        });
+    zoneData.highestCategoryKey = (zoneData.highestCategoryKey or 0) + 1;
 
-        self:normalizeSpawnRates();
-        self:sendSpawnRateUpdate();
+    local nextKey = tostring(zoneData.highestCategoryKey);
+    self.vehiclesCategoriesList:addItem(text, {
+        key = nextKey,
+        vehicles = {},
+        spawnRate = 0
+    });
 
-        local selectedZoneIdx = self:getSelectedZoneZoneIdx();
+    self:normalizeSpawnRates();
+    self:sendSpawnRateUpdate();
 
-        sendClientCommand("VehicleRespawnManager", "EditZoneData",
-            {
-                selectedIdx = selectedZoneIdx,
-                newKey = "vehicleSpawnCategories." .. nextKey,
-                newValue = {
-                    key = nextKey,
-                    name = text,
-                    vehicles = {},
-                    spawnRate = 0
-                }
+    local selectedZoneIdx = self:getSelectedZoneZoneIdx();
+
+    sendClientCommand("VehicleRespawnManager", "EditZoneData",
+        {
+            selectedIdx = selectedZoneIdx,
+            newKey = "vehicleSpawnCategories." .. nextKey,
+            newValue = {
+                key = nextKey,
+                name = text,
+                vehicles = {},
+                spawnRate = 0
             }
-        );
+        }
+    );
 
-        sendClientCommand("VehicleRespawnManager", "EditZoneData",
-            {
-                selectedIdx = selectedZoneIdx,
-                newKey = "highestCategoryKey",
-                newValue = nextKey
-            }
-        );
+    sendClientCommand("VehicleRespawnManager", "EditZoneData",
+        {
+            selectedIdx = selectedZoneIdx,
+            newKey = "highestCategoryKey",
+            newValue = nextKey
+        }
+    );
 
-        self.refresh = 3;
-    end
+    self.refresh = 3;
 end
 
 function RespawnControlPanel:onRemoveCategory()
@@ -1275,7 +1488,7 @@ function RespawnControlPanel.onSelectDefaultCategory(target, value)
 end
 
 function RespawnControlPanel:onAddVehicleModal()
-    local modal = VehicleScriptTextBox:new(0, 0, 400, 300, getText("IGUI_VRM_VehicleScript"), "", self,
+    local modal = VehicleScriptTextBox:new(0, 0, 300, 150, getText("IGUI_VRM_VehicleScript"), "", self,
         self.onAddVehicle, self.playerNum, "vehiclesAssignedList");
     modal.noEmpty = true;
     modal.checkVehicleScripts = true;
@@ -1286,7 +1499,7 @@ function RespawnControlPanel:onAddVehicleModal()
 end
 
 function RespawnControlPanel:onAddBatchVehicleModal()
-    local modal = VehicleScriptTextBox:new(0, 0, 400, 300, getText("IGUI_VRM_VehicleScriptBatch"), "", self,
+    local modal = VehicleScriptTextBox:new(0, 0, 300, 150, getText("IGUI_VRM_VehicleScriptBatch"), "", self,
         self.onAddVehicle, self.playerNum, "vehiclesAssignedList");
     modal.maxLines = 999;
     modal.multipleLine = true;
@@ -1304,13 +1517,12 @@ local function isScriptNameValid(scriptName)
 end
 
 function RespawnControlPanel:onAddVehicle(target, listType)
-    if target.internal ~= "OK" then return; end
+    if target.internal ~= "ADD" then return; end
 
-    local text = target.parent.entry:getText();
     local zoneData = self:getSelectedZoneData();
     if not zoneData then return; end
 
-    local vehiclesTable
+    local vehiclesTable;
     if listType == "blacklistedVehiclesList" then
         vehiclesTable = zoneData.zoneVehicleBlacklist;
     else
@@ -1326,15 +1538,18 @@ function RespawnControlPanel:onAddVehicle(target, listType)
 
     local function addVehicle(scriptName)
         scriptName = string.trim(scriptName);
-        if isScriptNameValid(scriptName) then
+        if isScriptNameValid(scriptName) and not vehiclesTable[scriptName] then
             self[listType]:addItem(scriptName);
             vehiclesTable[scriptName] = true;
         end
     end
 
+    local text = "";
     if target.parent.singleVehicleMode then
+        text = target.parent.entry:getSelectedText();
         addVehicle(text);
     else
+        text = target.parent.entry:getText();
         for scriptName in string.gmatch(text, "[^;]+") do
             addVehicle(scriptName);
         end
@@ -1359,6 +1574,20 @@ function RespawnControlPanel:onAddVehicle(target, listType)
             newValue = commandValue
         }
     );
+
+    if listType == "blacklistedVehiclesList" then
+        if self[listType].count > 0 then
+            self.removeBlacklistVehicleButton:setEnable(true);
+        else
+            self.removeBlacklistVehicleButton:setEnable(false);
+        end
+    else
+        if self[listType].count > 0 then
+            self.removeVehicleButton:setEnable(true);
+        else
+            self.removeVehicleButton:setEnable(false);
+        end
+    end
 
     -- self.refresh = 3;
 end
@@ -1398,7 +1627,7 @@ function RespawnControlPanel:onRemoveVehicle()
 end
 
 function RespawnControlPanel:onAddBlacklistVehicleModal()
-    local modal = VehicleScriptTextBox:new(0, 0, 400, 300, getText("IGUI_VRM_VehicleScript"), "", self,
+    local modal = VehicleScriptTextBox:new(0, 0, 300, 150, getText("IGUI_VRM_VehicleScript"), "", self,
         self.onAddVehicle, self.playerNum, "blacklistedVehiclesList");
     modal.noEmpty = true;
     modal.checkVehicleScripts = true;
@@ -1409,7 +1638,7 @@ function RespawnControlPanel:onAddBlacklistVehicleModal()
 end
 
 function RespawnControlPanel:onAddBatchBlacklistVehicleModal()
-    local modal = VehicleScriptTextBox:new(0, 0, 400, 300, getText("IGUI_VRM_VehicleScriptBatch"), "", self,
+    local modal = VehicleScriptTextBox:new(0, 0, 300, 150, getText("IGUI_VRM_VehicleScriptBatch"), "", self,
         self.onAddVehicle, self.playerNum, "blacklistedVehiclesList");
     modal.maxLines = 999;
     modal.multipleLine = true;

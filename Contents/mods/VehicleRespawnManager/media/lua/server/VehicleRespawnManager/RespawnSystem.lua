@@ -32,7 +32,6 @@ function VehicleRespawnManager.RespawnSystem.getGMD()
     if not gmd.SpawnRequestsQueue then gmd.SpawnRequestsQueue = {}; end
     if not gmd.LocationPendingSpawns then gmd.LocationPendingSpawns = {}; end
     if not gmd.TimedSpawns then gmd.TimedSpawns = {}; end
-    if not gmd.Options then gmd.Options = {}; end
     return gmd;
 end
 
@@ -161,22 +160,15 @@ function VehicleRespawnManager.RespawnSystem.IsZoneNearSafehouse(zone)
         local bufferX2 = safeX + safeW + buffer;
         local bufferY2 = safeY + safeH + buffer;
 
-        local zoneX1 = zone.coordinates.x1;
-        local zoneY1 = zone.coordinates.y1;
-        local zoneX2 = zone.coordinates.x2;
-        local zoneY2 = zone.coordinates.y2;
+        local zoneX1 = zone:getX();
+        local zoneY1 = zone:getY();
+        local zoneX2 = zoneX1 + zone:getWidth();
+        local zoneY2 = zoneY1 + zone:getHeight();
 
-        local intersectX = math.max(zoneX1, bufferX1) <= math.min(zoneX2, bufferX2);
-        local intersectY = math.max(zoneY1, bufferY1) <= math.min(zoneY2, bufferY2);
+        local intersectX = (zoneX1 >= bufferX1 and zoneX1 or bufferX1) <= (zoneX2 <= bufferX2 and zoneX2 or bufferX2);
+        local intersectY = (zoneY1 >= bufferY1 and zoneY1 or bufferY1) <= (zoneY2 <= bufferY2 and zoneY2 or bufferY2);
 
-        if intersectX and intersectY then
-            print("zone:getName() ", zone:getName())
-            print("bufferX1; %s, bufferY1; %s, bufferX2; %s, bufferY2; %s", tostring(bufferX1), tostring(bufferY1),
-                tostring(bufferX2), tostring(bufferY2))
-            print("zoneX1; %s, zoneY1; %s, zoneX2; %s, zoneY2; %s", tostring(zoneX1), tostring(zoneY1), tostring(zoneX2),
-                tostring(zoneY2))
-            return true;
-        end
+        if intersectX and intersectY then return true; end
     end
     return false;
 end
@@ -197,10 +189,9 @@ function VehicleRespawnManager.RespawnSystem.GetWorldZonesForCellAt(cellx, celly
     local cellData = grid:getCellDataAbs(cellx, celly);
 
     local zones = Reflection.getUnexposedObjectField(cellData, "vehicleZones");
-    local zoneCount = zones:size();
     local cellVehicleZones = table.newarray() --[[@as table]]
 
-    for i = 0, zoneCount - 1 do
+    for i = 0, zones:size() - 1 do
         local zone = zones:get(i);
         local substring = string.sub(tostring(zone), 1, 34);
         if substring == "zombie.iso.IsoMetaGrid$VehicleZone" then

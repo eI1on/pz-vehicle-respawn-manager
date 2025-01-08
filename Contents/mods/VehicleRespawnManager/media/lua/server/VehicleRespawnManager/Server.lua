@@ -1,6 +1,6 @@
 local Globals = require("Starlit/Globals");
 
-local Logger = require("ElyonLib/Logger"):new("Vehicle Respawn Manager");
+local Logger = require("VehicleRespawnManager/Logger");
 
 local VehicleRespawnManager = require("VehicleRespawnManager/Shared");
 VehicleRespawnManager.Server = {};

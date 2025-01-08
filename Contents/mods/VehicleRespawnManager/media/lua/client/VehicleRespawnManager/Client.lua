@@ -1,4 +1,4 @@
-local Logger = require("ElyonLib/Logger"):new("Vehicle Respawn Manager");
+local Logger = require("VehicleRespawnManager/Logger");
 local FileUtils = require("ElyonLib/FileUtils");
 
 local VehicleRespawnManager = require("VehicleRespawnManager/Shared");

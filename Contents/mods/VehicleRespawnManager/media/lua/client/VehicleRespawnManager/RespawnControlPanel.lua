@@ -1,4 +1,4 @@
-local Logger = require("ElyonLib/Logger"):new("Vehicle Respawn Manager");
+local Logger = require("VehicleRespawnManager/Logger");
 local FileUtils = require("ElyonLib/FileUtils");
 
 local ZONE_TEMPLATE = require("VehicleRespawnManager/ZONE_TEMPLATE");
@@ -591,7 +591,7 @@ function RespawnControlPanel:onVehiclesCategoriesListmousedown(target, item)
 end
 
 function RespawnControlPanel:onVehiclesCategoriesListMouseMove(dx, dy)
-    self.parent:normalizeSpawnRates();
+    -- self.parent:normalizeSpawnRates();
 
     if self.draggingSlider then
         local slider = self.draggingSlider;
@@ -606,9 +606,9 @@ function RespawnControlPanel:onVehiclesCategoriesListMouseMove(dx, dy)
 end
 
 function RespawnControlPanel:onVehiclesCategoriesListMouseUp(x, y)
-    local changes = self.parent:normalizeSpawnRates();
+    -- local changes = self.parent:normalizeSpawnRates();
 
-    if self.draggingSlider or changes then
+    if self.draggingSlider then
         self.parent:sendSpawnRateUpdate();
     end
 
@@ -1372,7 +1372,7 @@ function RespawnControlPanel:onAddCategory(target)
         spawnRate = 0
     });
 
-    self:normalizeSpawnRates();
+    -- self:normalizeSpawnRates();
     self:sendSpawnRateUpdate();
 
     local selectedZoneIdx = self:getSelectedZoneZoneIdx();

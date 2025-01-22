@@ -572,6 +572,26 @@ end
 -- Spawn Attempt and Handling
 -----------------------------------------------------
 
+local function parseIntervalString(intervalString)
+    local minEngineQuality, maxEngineQuality = 1, 5;
+
+    if intervalString then
+        local splitValues = {};
+        for value in string.gmatch(intervalString, "([^;]+)") do
+            table.insert(splitValues, tonumber(value));
+        end
+
+        if #splitValues == 1 then
+            minEngineQuality, maxEngineQuality = splitValues[1], splitValues[1];
+        elseif #splitValues == 2 then
+            minEngineQuality, maxEngineQuality = math.min(splitValues[1], splitValues[2]),
+                math.max(splitValues[1], splitValues[2]);
+        end
+    end
+
+    return minEngineQuality, maxEngineQuality;
+end
+
 function VehicleRespawnManager.RespawnSystem.SpawnVehicleAt(vehicleScript, x, y, direction)
     local cell = getCell();
     if not cell then return false, "noCell"; end
@@ -583,13 +603,20 @@ function VehicleRespawnManager.RespawnSystem.SpawnVehicleAt(vehicleScript, x, y,
 
     if not VehicleRespawnManager.RespawnSystem.TestSquare(square) then return false, "occupied"; end
 
-    Logger:debug("Spawning vehicle vehicleScript=\"%s\" at x=%d, y=%d.", vehicleScript, x, y);
-
     local dir = IsoDirections.Max;
     dir = IsoDirections[direction] or IsoDirections.Max;
 
     ---@diagnostic disable-next-line: param-type-mismatch
-    addVehicleDebug(vehicleScript, dir, nil, square);
+    local vehicle = addVehicleDebug(vehicleScript, dir, nil, square);
+
+    local intervalString = SandboxVars.VehicleRespawnManager.engineQuality or "1;100";
+    local minEngineQuality, maxEngineQuality = parseIntervalString(intervalString);
+
+    vehicle:setEngineFeature(rand:random(minEngineQuality, maxEngineQuality), vehicle:getEngineLoudness(),
+        vehicle:getForce());
+
+    Logger:debug("Spawning vehicle vehicleScript=\"%s\", engineQuallity=%d at x=%d, y=%d.", vehicleScript,
+        vehicle:getEngineQuality(), x, y);
 
     return true;
 end
@@ -689,7 +716,8 @@ function VehicleRespawnManager.RespawnSystem.ProcessSingleRequest(req)
         end
 
         categoryName = category.name;
-        vehicleScript = VehicleRespawnManager.RespawnSystem.ChooseVehicleFromCategory(category, zone.zoneVehicleBlacklist);
+        vehicleScript = VehicleRespawnManager.RespawnSystem.ChooseVehicleFromCategory(category, zone
+            .zoneVehicleBlacklist);
         if not vehicleScript then
             Logger:debug(
                 "No valid vehicle found in categoryName=\"%s\" in zoneName=\"%s\", attempt=%d. Re-queueing.",

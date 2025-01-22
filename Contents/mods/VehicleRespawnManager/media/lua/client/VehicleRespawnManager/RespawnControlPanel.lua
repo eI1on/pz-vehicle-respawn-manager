@@ -12,7 +12,38 @@ local RespawnControlPanel = ISCollapsableWindowJoypad:derive("RespawnControlPane
 ---@type RespawnControlPanel|nil;
 RespawnControlPanel.instance = nil;
 
-local FONT_HGT_MEDIUM = getTextManager():getFontHeight(UIFont.Medium);
+local UI = {
+    PADDING = {
+        SMALL = 5,
+        MEDIUM = 10,
+        LARGE = 15
+    },
+    COLORS = {
+        TEXT = { r = 0.9, g = 0.9, b = 0.9, a = 0.9 },
+        BORDER = { r = 0.4, g = 0.4, b = 0.4, a = 1 },
+        SELECTED = { r = 0.7, g = 0.35, b = 0.15, a = 0.3 },
+        BACKGROUND = { r = 0.1, g = 0.1, b = 0.1, a = 0.75 },
+
+        ARROW = { r = 0.4, g = 0.4, b = 0.4, a = 1 },
+        ARROW_HOVER = { r = 1.0, g = 1.0, b = 1.0, a = 1.0 }
+    },
+    FONTS = {
+        SMALL = UIFont.Small,
+        MEDIUM = UIFont.Medium,
+        LARGE = UIFont.Large
+    },
+    DIMENSIONS = {
+        MIN_WIDTH = 800,
+        MIN_HEIGHT = 700,
+        BUTTON_HEIGHT = 20,
+        INPUT_HEIGHT = 20,
+        LIST_HEIGHT = 150
+    },
+    ARROWS_TEX = {
+        LEFT = getTexture("media/ui/ArrowLeft.png"),
+        RIGHT = getTexture("media/ui/ArrowRight.png"),
+    }
+}
 
 local font_size, scale = getCore():getOptionFontSize() or 1, { 1, 1.3, 1.65, 1.95, 2.3 };
 RespawnControlPanel.scale = scale[font_size];
@@ -47,12 +78,14 @@ function RespawnControlPanel.openPanel()
 end
 
 local ISDebugMenu_setupButtons = ISDebugMenu.setupButtons;
+---@diagnostic disable-next-line: duplicate-set-field
 function ISDebugMenu:setupButtons()
     sendClientCommand("VehicleRespawnManager", "LoadZones", {});
     self:addButtonInfo("Vehicle Respawn Manager", function() RespawnControlPanel.openPanel() end, "MAIN");
     ISDebugMenu_setupButtons(self);
 end
 
+---@diagnostic disable-next-line: duplicate-set-field
 local ISAdminPanelUI_create = ISAdminPanelUI.create;
 function ISAdminPanelUI:create()
     ISAdminPanelUI_create(self);
@@ -82,45 +115,82 @@ function RespawnControlPanel:new(x, y, width, height, player)
     o.character           = player;
     o.playerNum           = player and player:getPlayerNum() or -1;
     o.title               = getText("IGUI_VRM_Title");
-    o.minimumWidth        = 700;
+    o.minimumWidth        = 700 * self.scale;
     o.minimumHeight       = 650;
+
+    o.borderColor         = UI.COLORS.BORDER;
+    o.backgroundColor     = UI.COLORS.BACKGROUND;
 
     o.vehicleRespawnZones = VehicleRespawnManager.Shared.RequestZones();
 
     return o;
 end
 
-function RespawnControlPanel:setupExportImportButtons(th, padding)
-    local buttonWidth = (self:getWidth() / 3 - 2 * padding - padding) / 2;
-    self.importButton = self:createButton(
-        self:getWidth() - buttonWidth - padding,
-        th + padding, buttonWidth, 20, getText("IGUI_VRM_Import"),
-        self.onImport
-    );
-    self.importButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
-    self.exportButton = self:createButton(
-        self.importButton:getX() - buttonWidth - padding,
-        th + padding, buttonWidth, 20, getText("IGUI_VRM_Export"),
-        self.onExport
-    );
-    self.exportButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+function RespawnControlPanel:createChildren()
+    ISCollapsableWindowJoypad.createChildren(self);
+
+    local titleHeight = self:titleBarHeight();
+    self:setupBasicLayout(titleHeight);
+    self:setupCoordinateInputs();
+    self:setupCategoriesSection();
+    self:setupAssignedVehiclesSection();
+    self:setupBlacklistSection();
+    self:setupAdditionalOptions();
+
+    self:populateElements();
 end
 
-function RespawnControlPanel:setupCoordinateInputs(padding)
-    local xBase = self:getWidth() * 0.625;
+function RespawnControlPanel:setupBasicLayout(titleHeight)
+    self:setupExportImportButtons(titleHeight, UI.PADDING.MEDIUM);
+    self:setupZoneNameComboBox(titleHeight, UI.PADDING.MEDIUM);
+
+    self.zoneOptionsTickBox = self:createTickBox(
+        self.zoneNameComboBox:getRight() + UI.PADDING.MEDIUM,
+        self.zoneNameComboBox:getY(),
+        {
+            getText("IGUI_VRM_ZoneIsGlobal"),
+            getText("IGUI_VRM_ZoneIsBlacklist")
+        }
+    );
+    self.zoneOptionsTickBox.changeOptionTarget = self;
+    self.zoneOptionsTickBox.changeOptionMethod = self.onTickBoxZoneOptions;
+    self.zoneOptionsTickBox.tooltip = getText("IGUI_VRM_ZoneOptions_tooltip");
+end
+
+function RespawnControlPanel:setupExportImportButtons(th, padding)
+    local buttonWidth = (self:getWidth() / 3 - padding) / 2;
+    local buttonHeight = UI.DIMENSIONS.BUTTON_HEIGHT * self.scale;
+
+    self.importButton = self:createButton(
+        self:getWidth() - buttonWidth - padding,
+        th + padding, buttonWidth, buttonHeight,
+        getText("IGUI_VRM_Import"),
+        self.onImport
+    );
+    self.exportButton = self:createButton(
+        self.importButton:getX() - buttonWidth - padding,
+        th + padding, buttonWidth, buttonHeight,
+        getText("IGUI_VRM_Export"),
+        self.onExport
+    );
+end
+
+function RespawnControlPanel:setupCoordinateInputs()
+    local padding = UI.PADDING.SMALL;
+    local xBase = self.exportButton:getX();
     local yBase = self.zoneNameComboBox:getY();
     local halfPadding = padding / 2;
+    local inputHeight = UI.DIMENSIONS.INPUT_HEIGHT * self.scale;
 
-    self.coordsErrorLabel = self:createLabel(self.importButton:getX() - halfPadding, yBase - halfPadding, "");
+    self.coordsErrorLabel = self:createLabel(self.importButton:getX() - halfPadding, yBase, "");
+    self.coordsErrorLabel.font = UI.FONTS.MEDIUM;
+    self.coordsErrorLabel:setHeight(getTextManager():getFontHeight(UI.FONTS.SMALL));
     self.coordsErrorLabel.center = true;
-    self.x1Label, self.x1Input = self:setupCoordinateField(xBase, self.coordsErrorLabel:getBottom() + halfPadding,
-        getText("IGUI_VRM_X1"), "x1");
-    self.y1Label, self.y1Input = self:setupCoordinateField(self:getWidth() * 0.75,
-        self.coordsErrorLabel:getBottom() + halfPadding, getText("IGUI_VRM_Y1"), "y1");
-    self.x2Label, self.x2Input = self:setupCoordinateField(xBase, self.x1Label:getBottom() + halfPadding,
-        getText("IGUI_VRM_X2"), "x2");
-    self.y2Label, self.y2Input = self:setupCoordinateField(self:getWidth() * 0.75, self.x1Label:getBottom() + halfPadding,
-        getText("IGUI_VRM_Y2"), "y2");
+
+    self.x1Label, self.x1Input = self:setupCoordinateField(xBase, self.coordsErrorLabel:getBottom() + halfPadding, getText("IGUI_VRM_X1"), "x1", inputHeight);
+    self.y1Label, self.y1Input = self:setupCoordinateField(self.x1Input:getRight() + halfPadding, self.x1Input:getY(), getText("IGUI_VRM_Y1"), "y1", inputHeight);
+    self.x2Label, self.x2Input = self:setupCoordinateField(xBase, self.x1Input:getBottom() + halfPadding, getText("IGUI_VRM_X2"), "x2", inputHeight);
+    self.y2Label, self.y2Input = self:setupCoordinateField(self.x2Input:getRight() + halfPadding, self.x2Input:getY(), getText("IGUI_VRM_Y2"), "y2", inputHeight);
 
     self.x1Input.tooltip = getText("IGUI_VRM_CoordsInputs_tooltip");
     self.y1Input.tooltip = getText("IGUI_VRM_CoordsInputs_tooltip");
@@ -128,9 +198,14 @@ function RespawnControlPanel:setupCoordinateInputs(padding)
     self.y2Input.tooltip = getText("IGUI_VRM_CoordsInputs_tooltip");
 end
 
-function RespawnControlPanel:setupCoordinateField(x, y, labelText, coordType)
+function RespawnControlPanel:setupCoordinateField(x, y, labelText, coordType, height)
     local label = self:createLabel(x, y, labelText);
-    local input = self:createTextInput(label:getRight() + 10, y);
+    label.font = UI.FONTS.SMALL;
+    label:setHeight(getTextManager():getFontHeight(UI.FONTS.SMALL));
+
+    local input = self:createTextInput(label:getRight() + UI.PADDING.SMALL, y);
+    input:setHeight(height);
+    input.font = UI.FONTS.SMALL;
     input.coordType = coordType;
     input.onTextChange = self.onCoordsInputChange;
     input:setOnlyNumbers(true);
@@ -149,76 +224,71 @@ function RespawnControlPanel:setupZoneNameComboBox(th, padding)
     self.zoneNameComboBox:setToolTipMap(map);
 
     local buttonWidth = (self.zoneNameComboBox:getWidth() - padding) / 2;
+    local buttonHeight = UI.DIMENSIONS.BUTTON_HEIGHT * self.scale;
+
     self.addZoneButton = self:createButton(
-        padding, self.zoneNameComboBox:getBottom() + padding, buttonWidth, 25,
-        getText("IGUI_VRM_AddZone"), self.onAddZone
+        padding,
+        self.zoneNameComboBox:getBottom() + padding,
+        buttonWidth,
+        buttonHeight,
+        getText("IGUI_VRM_AddZone"),
+        self.onAddZone
     );
-    self.addZoneButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
     self.addZoneButton.tooltip = getText("IGUI_VRM_AddZone_tooltip");
 
     self.removeZoneButton = self:createButton(
-        self.addZoneButton:getRight() + padding, self.addZoneButton:getY(),
-        buttonWidth, 25, getText("IGUI_VRM_RemoveZone"), self.onRemoveZone
+        self.addZoneButton:getRight() + padding,
+        self.addZoneButton:getY(),
+        buttonWidth,
+        buttonHeight,
+        getText("IGUI_VRM_RemoveZone"),
+        self.onRemoveZone
     );
-    self.removeZoneButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
     self.removeZoneButton.tooltip = getText("IGUI_VRM_RemoveZone_tooltip");
 end
 
-function RespawnControlPanel:createChildren()
-    ISCollapsableWindowJoypad.createChildren(self);
-    local th, padding, bttnHeight = self:titleBarHeight(), 10, 25;
+function RespawnControlPanel:setupCategoriesSection()
+    local twoThirdsWidth = self:getWidth() * 2 / 3;
 
-
-    self:setupExportImportButtons(th, padding);
-    self:setupZoneNameComboBox(th, padding);
-
-    self.zoneOptionsTickBox = self:createTickBox(
-        self.zoneNameComboBox:getRight() + padding, self.zoneNameComboBox:getY(),
-        { getText("IGUI_VRM_ZoneIsGlobal"), getText("IGUI_VRM_ZoneIsBlacklist") }
-    );
-    self.zoneOptionsTickBox.changeOptionTarget = self;
-    self.zoneOptionsTickBox.changeOptionMethod = self.onTickBoxZoneOptions;
-    self.zoneOptionsTickBox.tooltip = getText("IGUI_VRM_ZoneOptions_tooltip");
-
-    self:setupCoordinateInputs(padding);
-
-    local twoThirdsListWidth = self:getWidth() * 2 / 3;
-
-    local categoriesLabelX = padding + twoThirdsListWidth / 4;
-    local categoriesLabelY = self.addZoneButton:getBottom() + padding;
-    self.vehicleCategoriesLabel = self:createLabel(categoriesLabelX, categoriesLabelY,
+    self.vehicleCategoriesLabel = self:createLabel(
+        UI.PADDING.MEDIUM + twoThirdsWidth / 4,
+        self.addZoneButton:getBottom() + UI.PADDING.MEDIUM,
         getText("IGUI_VRM_VehiclesCategories")
     );
     self.vehicleCategoriesLabel.center = true;
 
-
-    local spawnRatesLabelX = padding + (twoThirdsListWidth / 4) * 3;
-    local spawnRatesLabelY = categoriesLabelY;
-    self.spawnRatesLabel = self:createLabel(spawnRatesLabelX, spawnRatesLabelY, getText("IGUI_VRM_SpawnRates"));
+    self.spawnRatesLabel = self:createLabel(
+        UI.PADDING.MEDIUM + (twoThirdsWidth / 4) * 3,
+        self.vehicleCategoriesLabel:getY(),
+        getText("IGUI_VRM_SpawnRates")
+    );
     self.spawnRatesLabel.center = true;
 
-
     self.vehiclesCategoriesList = self:createScrollingListBox(
-        padding,
+        UI.PADDING.MEDIUM,
         self.vehicleCategoriesLabel:getBottom(),
-        twoThirdsListWidth,
-        150
+        twoThirdsWidth,
+        UI.DIMENSIONS.LIST_HEIGHT
     );
-    self.vehiclesCategoriesList:setFont(UIFont.Medium, 7);
+    self:configureCategoriesList();
+    self:addVehicleCategoryButtons();
+end
+
+function RespawnControlPanel:configureCategoriesList()
+    self.vehiclesCategoriesList:setFont(UI.FONTS.MEDIUM, 7);
     self.vehiclesCategoriesList.doDrawItem = self.drawVehiclesCategoriesListItem;
     self.vehiclesCategoriesList.onMouseDown = self.onVehiclesCategoriesListMouseDown;
     self.vehiclesCategoriesList.onMouseMove = self.onVehiclesCategoriesListMouseMove;
     self.vehiclesCategoriesList.onMouseUp = self.onVehiclesCategoriesListMouseUp;
-
     self.vehiclesCategoriesList.onmousedown = self.onVehiclesCategoriesListmousedown;
     self.vehiclesCategoriesList.target = self;
-    self:addVehicleCategoryButtons();
+end
 
-
-    local oneThirdListWidth = self:getWidth() / 3 - 2 * padding;
+function RespawnControlPanel:setupAssignedVehiclesSection()
+    local oneThirdWidth = self:getWidth() / 3 - 2 * UI.PADDING.MEDIUM;
 
     self.vehiclesAssignedLabel = self:createLabel(
-        self.vehiclesCategoriesList:getRight() + oneThirdListWidth / 2,
+        self.vehiclesCategoriesList:getRight() + oneThirdWidth / 2,
         self.vehicleCategoriesLabel:getY(),
         getText("IGUI_VRM_VehiclesAssigned")
     );
@@ -227,38 +297,40 @@ function RespawnControlPanel:createChildren()
     self.vehiclesAssignedList = self:createScrollingListBox(
         self.vehiclesCategoriesList:getRight(),
         self.vehiclesCategoriesList:getY(),
-        oneThirdListWidth,
-        150
+        oneThirdWidth,
+        UI.DIMENSIONS.LIST_HEIGHT
     );
-    self.vehiclesAssignedList:setFont(UIFont.Small, 7);
+    self.vehiclesAssignedList:setFont(UI.FONTS.SMALL, 7);
     self.vehiclesAssignedList.onmousedown = self.onVehiclesAssignedListMouseDown;
     self.vehiclesAssignedList.target = self;
-    self:addVehicleAssignmentButtons();
 
+    self:addVehicleAssignmentButtons();
+end
+
+function RespawnControlPanel:setupBlacklistSection()
+    local oneThirdWidth = self:getWidth() / 3 - 2 * UI.PADDING.MEDIUM;
 
     self.blacklistedVehiclesLabel = self:createLabel(
-        self.addBatchVehiclesButton:getX() + (self:getWidth() / 3 - 2 * padding) / 2,
-        self.addBatchVehiclesButton:getBottom() + padding, getText("IGUI_VRM_Blacklist")
+        self.addBatchVehiclesButton:getX() + oneThirdWidth / 2,
+        self.addBatchVehiclesButton:getBottom() + UI.PADDING.MEDIUM,
+        getText("IGUI_VRM_Blacklist")
     );
     self.blacklistedVehiclesLabel.center = true;
-
 
     self.blacklistedVehiclesList = self:createScrollingListBox(
         self.addBatchVehiclesButton:getX(),
         self.blacklistedVehiclesLabel:getBottom(),
-        oneThirdListWidth,
-        150
+        oneThirdWidth,
+        UI.DIMENSIONS.LIST_HEIGHT
     );
-    self.blacklistedVehiclesList:setFont(UIFont.Small, 7);
-    self.blacklistedVehiclesList.onmousedown = self.onBlacklistedVehiclesListMouseDown;
-    self.blacklistedVehiclesList.target = self;
+    self.blacklistedVehiclesList:setFont(UI.FONTS.SMALL, 7);
+    self.blacklistedVehiclesList.doDrawItem = self.drawBlacklistedVehiclesListItem;
     self:addBlacklistedVehiclesButtons();
+end
 
+function RespawnControlPanel:setupAdditionalOptions()
     self:addDefaultCategoryOptions();
-
     self:addManualVehicleSpawn();
-
-    self:populateElements();
 end
 
 function RespawnControlPanel:prerender()
@@ -505,63 +577,110 @@ function RespawnControlPanel:populateBlacklistedVehiclesList()
 end
 
 function RespawnControlPanel:drawVehiclesCategoriesListItem(y, item, alt)
-    if not item.height then item.height = self.itemheight; end
+    local height = self.itemheight;
+    local width = self:getWidth();
 
     if self.selected == item.index then
-        self:drawRect(0, y, self:getWidth(), item.height - 1, 0.3, 0.7, 0.35, 0.15);
+        self:drawRect(0, y, width, height - 1, 0.3, UI.COLORS.SELECTED.r, UI.COLORS.SELECTED.g, UI.COLORS.SELECTED.b);
     end
 
-    self:drawRectBorder(0, y, self:getWidth(), item.height, 0.5, self.borderColor.r, self.borderColor.g,
-        self.borderColor.b);
+    self:drawRectBorder(0, y, width, height, UI.COLORS.BORDER.a, UI.COLORS.BORDER.r, UI.COLORS.BORDER.g,
+        UI.COLORS.BORDER.b);
 
-    local itemPadY = self.itemPadY or (item.height - self.fontHgt) / 2;
-    self:drawText(item.text, 15, y + itemPadY, 0.9, 0.9, 0.9, 0.9, self.font);
+    local textY = y + (height - self.fontHgt) / 2;
+    self:drawText(item.text, UI.PADDING.MEDIUM, textY, UI.COLORS.TEXT.r, UI.COLORS.TEXT.g, UI.COLORS.TEXT.b,
+        UI.COLORS.TEXT.a, self.font);
 
-    local sliderX = self:getWidth() / 2;
-    local sliderWidth = self:getWidth() / 3;
-    local sliderHeight = 10;
-    local sliderY = y + (item.height / 2) - (sliderHeight / 2);
+    local sliderX = width / 2;
+    local sliderWidth = width / 3;
+    local sliderHeight = 10 * self.parent.scale;
+    local sliderY = y + (height / 2) - (sliderHeight / 2);
     local value = item.item.spawnRate or 0;
 
     self:drawRect(sliderX, sliderY, sliderWidth, sliderHeight, 0.4, 0.3, 0.3, 0.3);
 
     local handleX = sliderX + (sliderWidth * (value / 100)) - 5;
-    self:drawRect(handleX, sliderY - 2, 10, sliderHeight + 4, 1, 0.2, 0.6, 0.9);
+    self:drawRect(handleX, sliderY - 2, 10 * self.parent.scale, sliderHeight + 4, 1, UI.COLORS.BORDER.r,
+        UI.COLORS.BORDER.g, UI.COLORS.BORDER.b);
 
-    local textPadding = 10;
+    local arrowSize = self.fontHgt;
+    local btnLeftDim = {
+        x = sliderX - (arrowSize * 1.5),
+        y = y + (height / 2) - ((sliderHeight * 1.5) / 2),
+        w = arrowSize,
+        h = sliderHeight * 1.5
+    };
+    local btnRightDim = {
+        x = sliderX + sliderWidth + (arrowSize * 0.5),
+        y = y + (height / 2) - ((sliderHeight * 1.5) / 2),
+        w = arrowSize,
+        h = sliderHeight * 1.5
+    };
+
+    self.btnLeftDim = btnLeftDim;
+    self.btnRightDim = btnRightDim;
+
+    local c = UI.COLORS.ARROW;
+    if self.leftPressed then c = UI.COLORS.ARROW_HOVER; end
+    self:drawTextureScaled(UI.ARROWS_TEX.LEFT, btnLeftDim.x, btnLeftDim.y, btnLeftDim.w, btnLeftDim.h, c.a, c.r, c.g, c
+        .b);
+
+    if self.rightPressed then c = UI.COLORS.ARROW_HOVER; else c = UI.COLORS.ARROW; end
+    self:drawTextureScaled(UI.ARROWS_TEX.RIGHT, btnRightDim.x, btnRightDim.y, btnRightDim.w, btnRightDim.h, c.a, c.r, c
+        .g, c.b);
+
     local rateText = string.format("%d%%", math.floor(value));
-    local rateX = sliderX + sliderWidth + textPadding;
-    self:drawText(rateText, rateX, sliderY - (self.fontHgt / 2) + (sliderHeight / 2), 0.9, 0.9, 0.9, 0.9, self.font);
+    local rateX = btnRightDim.x + btnRightDim.w + UI.PADDING.SMALL
+    self:drawText(rateText, rateX, sliderY - (self.fontHgt / 2) + (sliderHeight / 2), UI.COLORS.TEXT.r, UI.COLORS.TEXT.g,
+        UI.COLORS.TEXT.b, UI.COLORS.TEXT.a, self.font);
 
+    return y + height;
+end
+
+function RespawnControlPanel:drawBlacklistedVehiclesListItem(y, item, alt)
+    self:setStencilRect(0, 0, self.width, self.height);
+    if not item.height then item.height = self.itemheight; end
+    if self.selected == item.index then
+        self:drawRect(0, (y), self:getWidth(), item.height - 1, 0.3, 0.7, 0.35, 0.15);
+    end
+    self:drawRectBorder(0, (y), self:getWidth(), item.height, 0.5, self.borderColor.r, self.borderColor.g,
+        self.borderColor.b);
+    local itemPadY = self.itemPadY or (item.height - self.fontHgt) / 2;
+    self:drawText(item.text, 15, (y) + itemPadY, 0.9, 0.9, 0.9, 0.9, self.font);
     y = y + item.height;
+    self:clearStencilRect();
     return y;
 end
 
 function RespawnControlPanel:onVehiclesCategoriesListMouseDown(x, y)
     if self.items and #self.items == 0 then return; end
-    -- if #self.items == 1 then return; end
 
     local row = self:rowAt(x, y);
-
-    if row > #self.items then
-        row = #self.items;
-    end
-    if row < 1 then
-        row = 1;
-    end
-
-    local function getRowY(row)
-        return (row - 1) * self.itemheight - (self.vscroll and self.vscroll.pos or 0);
-    end
+    if row > #self.items then row = #self.items; end
+    if row < 1 then row = 1; end
 
     local item = self.items[row].item;
-    local itemY = getRowY(row);
+    local btnLeftDim = self.btnLeftDim;
+    local btnRightDim = self.btnRightDim;
+
+    if x >= btnLeftDim.x and x <= btnLeftDim.x + btnLeftDim.w and y >= btnLeftDim.y and y <= btnLeftDim.y + btnLeftDim.h then
+        item.spawnRate = math.max(0, (item.spawnRate or 0) - 1);
+        self.leftPressed = true;
+        self.parent:sendSpawnRateUpdate();
+        return;
+    end
+
+    if x >= btnRightDim.x and x <= btnRightDim.x + btnRightDim.w and y >= btnRightDim.y and y <= btnRightDim.y + btnRightDim.h then
+        item.spawnRate = math.min(100, (item.spawnRate or 0) + 1);
+        self.rightPressed = true;
+        self.parent:sendSpawnRateUpdate();
+        return
+    end
 
     local sliderX = self:getWidth() / 2;
     local sliderWidth = self:getWidth() / 3;
     local sliderHeight = 10;
-    local sliderY = itemY + (self.itemheight / 2) - (sliderHeight / 2);
-
+    local sliderY = (row - 1) * self.itemheight + (self.itemheight / 2) - (sliderHeight / 2);
     local value = item.spawnRate or 0;
     local handleX = sliderX + (sliderWidth * (value / 100)) - 5;
     local handleWidth = 10;
@@ -606,7 +725,8 @@ function RespawnControlPanel:onVehiclesCategoriesListMouseMove(dx, dy)
 end
 
 function RespawnControlPanel:onVehiclesCategoriesListMouseUp(x, y)
-    -- local changes = self.parent:normalizeSpawnRates();
+    self.leftPressed = false;
+    self.rightPressed = false;
 
     if self.draggingSlider then
         self.parent:sendSpawnRateUpdate();
@@ -695,18 +815,23 @@ function RespawnControlPanel:sendSpawnRateUpdate()
 end
 
 function RespawnControlPanel:createLabel(x, y, text)
-    local label = ISLabel:new(x, y, getTextManager():MeasureStringY(UIFont.Medium, text), text, 1, 1, 1, 1, UIFont
-        .Medium, true);
+    local fontHeight = getTextManager():getFontHeight(UI.FONTS.MEDIUM);
+    local label = ISLabel:new(x, y, fontHeight, text, 1, 1, 1, 1, UI.FONTS.MEDIUM, true);
     label:initialise();
     label:instantiate();
+    label.font = UI.FONTS.MEDIUM;
     self:addChild(label);
     return label;
 end
 
 function RespawnControlPanel:createComboBox(x, y, widthRatio)
-    local dropdown = ISComboBox:new(x, y, self:getWidth() * widthRatio, 30, self, nil);
+    local width = self:getWidth() * widthRatio;
+    local height = UI.DIMENSIONS.INPUT_HEIGHT * self.scale;
+    local dropdown = ISComboBox:new(x, y, width, height, self, nil);
     dropdown:initialise();
     dropdown:instantiate();
+    dropdown.backgroundColor = UI.COLORS.BACKGROUND;
+    dropdown.borderColor = UI.COLORS.BORDER;
     self:addChild(dropdown);
     return dropdown;
 end
@@ -715,17 +840,21 @@ function RespawnControlPanel:createButton(x, y, width, height, text, onClick)
     local button = ISButton:new(x, y, width, height, text, self, onClick);
     button:initialise();
     button:instantiate();
+    button.backgroundColor = UI.COLORS.BACKGROUND;
+    button.font = UI.FONTS.SMALL;
     self:addChild(button);
     return button;
 end
 
 function RespawnControlPanel:createTickBox(x, y, options)
-    local tickBox = ISTickBox:new(x, y, 0, 30, "", self, nil);
+    local tickBox = ISTickBox:new(x, y, 0, UI.DIMENSIONS.INPUT_HEIGHT * self.scale, "", self, nil);
     for i = 1, #options do
         tickBox:addOption(options[i]);
     end
-    tickBox:setFont(UIFont.Medium);
+    tickBox:setFont(UI.FONTS.MEDIUM);
     tickBox:setWidthToFit();
+    tickBox.backgroundColor = UI.COLORS.BACKGROUND;
+    tickBox.borderColor = UI.COLORS.BORDER;
     self:addChild(tickBox);
     return tickBox;
 end
@@ -736,92 +865,95 @@ function RespawnControlPanel:createScrollingListBox(x, y, width, height)
     listBox:instantiate();
     listBox.joypadParent = self;
     listBox.drawBorder = true;
+    listBox.borderColor = UI.COLORS.BORDER;
+    listBox.backgroundColor = UI.COLORS.BACKGROUND;
+    listBox.itemPadding = UI.PADDING.SMALL;
+    listBox.font = UI.FONTS.SMALL;
+    listBox.itemheight = getTextManager():getFontHeight(UI.FONTS.SMALL) + UI.PADDING.MEDIUM;
     listBox.mainUI = self;
     self:addChild(listBox);
     return listBox;
 end
 
 function RespawnControlPanel:createTextInput(x, y)
-    local textBox = ISTextEntryBox:new("", x, y, 50, 20);
+    local width = 50 * self.scale;
+    local height = UI.DIMENSIONS.INPUT_HEIGHT * self.scale;
+    local textBox = ISTextEntryBox:new("", x, y, width, height);
     textBox:initialise();
     textBox:instantiate();
+    textBox.backgroundColor = UI.COLORS.BACKGROUND;
+    textBox.borderColor = UI.COLORS.BORDER;
+    textBox.font = UI.FONTS.SMALL;
     self:addChild(textBox);
     return textBox;
 end
 
 function RespawnControlPanel:addVehicleCategoryButtons()
     local buttonWidth = self.vehiclesCategoriesList:getWidth() / 4;
-    local bttnHeight = 25;
+    local buttonHeight = UI.DIMENSIONS.BUTTON_HEIGHT * self.scale;
+
     self.addCategoryButton = self:createButton(self.vehiclesCategoriesList:getX(),
-        self.vehiclesCategoriesList:getBottom() + 10, buttonWidth, bttnHeight, getText("IGUI_VRM_AddCategory"),
+        self.vehiclesCategoriesList:getBottom() + 10, buttonWidth, buttonHeight, getText("IGUI_VRM_AddCategory"),
         self.onAddCategoryModal
     );
-    self.addCategoryButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
     self.addCategoryButton.tooltip = getText("IGUI_VRM_AddCategory_tooltip");
 
     self.removeCategoryButton = self:createButton(self.addCategoryButton:getRight() + 10,
-        self.vehiclesCategoriesList:getBottom() + 10, buttonWidth, bttnHeight, getText("IGUI_VRM_RemoveCategory"),
+        self.vehiclesCategoriesList:getBottom() + 10, buttonWidth, buttonHeight, getText("IGUI_VRM_RemoveCategory"),
         self.onRemoveCategory
     );
-    self.removeCategoryButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
     self.removeCategoryButton.tooltip = getText("IGUI_VRM_RemoveCategory_tooltip");
 end
 
 function RespawnControlPanel:addVehicleAssignmentButtons()
-    local padding = 10;
-    local bttnHeight = 25;
+    local padding = UI.PADDING.MEDIUM;
+    local buttonHeight = UI.DIMENSIONS.BUTTON_HEIGHT * self.scale;
     local buttonWidth = (self.vehiclesAssignedList:getWidth() - padding) / 2;
 
     self.addVehicleButton = self:createButton(self.vehiclesAssignedList:getX(),
-        self.vehiclesAssignedList:getBottom() + padding, buttonWidth, bttnHeight, getText("IGUI_VRM_AddVehicle"),
+        self.vehiclesAssignedList:getBottom() + padding, buttonWidth, buttonHeight, getText("IGUI_VRM_AddVehicle"),
         self.onAddVehicleModal
     );
-    self.addVehicleButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
     self.addVehicleButton.tooltip = getText("IGUI_VRM_AddVehicle_tooltip");
 
     self.addBatchVehiclesButton = self:createButton(self.addVehicleButton:getX(),
-        self.addVehicleButton:getBottom() + padding, buttonWidth, bttnHeight, getText("IGUI_VRM_BatchAddVehicle"),
+        self.addVehicleButton:getBottom() + padding, buttonWidth, buttonHeight, getText("IGUI_VRM_BatchAddVehicle"),
         self.onAddBatchVehicleModal
     );
-    self.addBatchVehiclesButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
     self.addBatchVehiclesButton.tooltip = getText("IGUI_VRM_AddVehicle_tooltip");
 
     self.removeVehicleButton = self:createButton(self.addVehicleButton:getRight() + padding,
-        self.vehiclesAssignedList:getBottom() + padding, buttonWidth, bttnHeight, getText("IGUI_VRM_RemoveVehicle"),
+        self.vehiclesAssignedList:getBottom() + padding, buttonWidth, buttonHeight, getText("IGUI_VRM_RemoveVehicle"),
         self.onRemoveVehicle
     );
-    self.removeVehicleButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
     self.removeVehicleButton.tooltip = getText("IGUI_VRM_RemoveVehicle_tooltip");
 end
 
 function RespawnControlPanel:addBlacklistedVehiclesButtons()
-    local padding = 10;
-    local bttnHeight = 25;
+    local padding = UI.PADDING.MEDIUM;
+    local buttonHeight = UI.DIMENSIONS.BUTTON_HEIGHT * self.scale;
     local buttonWidth = (self.blacklistedVehiclesList:getWidth() - padding) / 2;
 
     self.addBlacklistVehicleButton = self:createButton(self.blacklistedVehiclesList:getX(),
-        self.blacklistedVehiclesList:getBottom() + padding, buttonWidth, bttnHeight, getText("IGUI_VRM_AddBlacklist"),
+        self.blacklistedVehiclesList:getBottom() + padding, buttonWidth, buttonHeight, getText("IGUI_VRM_AddBlacklist"),
         self.onAddBlacklistVehicleModal);
-    self.addBlacklistVehicleButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
     self.addBlacklistVehicleButton.tooltip = getText("IGUI_VRM_AddBlacklist_tooltip");
 
     self.addBatchBlacklistVehiclesButton = self:createButton(self.addBlacklistVehicleButton:getX(),
-        self.addBlacklistVehicleButton:getBottom() + padding, buttonWidth, bttnHeight,
+        self.addBlacklistVehicleButton:getBottom() + padding, buttonWidth, buttonHeight,
         getText("IGUI_VRM_BatchAddBlacklist"), self.onAddBatchBlacklistVehicleModal);
-    self.addBatchBlacklistVehiclesButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
     self.addBatchBlacklistVehiclesButton.tooltip = getText("IGUI_VRM_AddBlacklist_tooltip");
 
     self.removeBlacklistVehicleButton = self:createButton(self.addBlacklistVehicleButton:getRight() + padding,
-        self.blacklistedVehiclesList:getBottom() + padding, buttonWidth, bttnHeight, getText("IGUI_VRM_RemoveBlacklist"),
-        self.onRemoveBlacklistVehicle);
-    self.removeBlacklistVehicleButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
+        self.blacklistedVehiclesList:getBottom() + padding, buttonWidth, buttonHeight,
+        getText("IGUI_VRM_RemoveBlacklist"), self.onRemoveBlacklistVehicle);
     self.removeBlacklistVehicleButton.tooltip = getText("IGUI_VRM_RemoveBlacklist_tooltip");
 end
 
 function RespawnControlPanel:addDefaultCategoryOptions()
-    local padding = 10;
+    local padding = UI.PADDING.MEDIUM;
+    local buttonHeight = UI.DIMENSIONS.BUTTON_HEIGHT * self.scale;
     local buttonWidth = self.vehiclesCategoriesList:getWidth() / 4;
-    local bttnHeight = 25;
 
     self.defaultCatUnassignedVehiclesTickBox = self:createTickBox(padding, self.addCategoryButton:getBottom() + 2 *
         padding, { getText("IGUI_VRM_DefaultCatForUnassignedVehicles") }
@@ -831,10 +963,9 @@ function RespawnControlPanel:addDefaultCategoryOptions()
     self.defaultCatUnassignedVehiclesTickBox.tooltip = getText("IGUI_VRM_DefaultCatForUnassignedVehicles_tooltip");
 
     self.setDefaultCategoryButton = self:createButton(padding,
-        self.defaultCatUnassignedVehiclesTickBox:getBottom() + padding, buttonWidth, bttnHeight,
+        self.defaultCatUnassignedVehiclesTickBox:getBottom() + padding, buttonWidth, buttonHeight,
         getText("IGUI_VRM_SetDefaultCat"), self.onSetDefaultCategory
     );
-    self.setDefaultCategoryButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
     self.setDefaultCategoryButton.tooltip = getText("IGUI_VRM_SetDefaultCat_tooltip");
 
     self.currentDefaultCategoryLabel = self:createLabel(self.setDefaultCategoryButton:getRight() + padding,
@@ -856,13 +987,11 @@ function RespawnControlPanel:addDefaultCategoryOptions()
 end
 
 function RespawnControlPanel:addManualVehicleSpawn()
-    local padding = 10;
-    local bttnHeight = 25;
+    local padding = UI.PADDING.MEDIUM;
+    local buttonHeight = UI.DIMENSIONS.BUTTON_HEIGHT * self.scale;
 
     self.manualVehicleSpawnLabel = self:createLabel(2 * padding, self.maxVehiclesPerZoneLabel:getBottom() + 2 * padding,
         getText("IGUI_VRM_ManualVehicleSpawn"));
-    self.manualVehicleSpawnLabel.backgroundColor = { r = 0, g = 0, b = 0, a = 1 };
-
 
     self.vehicleSpawnMethodLabel = self:createLabel(3 * padding, self.manualVehicleSpawnLabel:getBottom() + padding,
         getText("IGUI_VRM_SpawnMethod"));
@@ -900,8 +1029,6 @@ function RespawnControlPanel:addManualVehicleSpawn()
     self.spawnCountInput:setHeight(20);
     self.spawnCountInput:setOnlyNumbers(true);
 
-
-
     self.spawnVehicleScriptLabel = self:createLabel(self.spawnCountLabel:getRight() + padding,
         self.spawnCountLabel:getY(), getText("IGUI_VRM_SpawnVehicleScript"));
     self.spawnVehicleScriptLabel.font = UIFont.Small;
@@ -934,10 +1061,9 @@ function RespawnControlPanel:addManualVehicleSpawn()
     self.spawnVehicleInput:setOnlyNumbers(false);
 
     self.spawnManualVehicleButton = self:createButton(2 * padding,
-        self.vehicleSpawnMethodRadioBttn:getBottom() + padding, self.vehiclesCategoriesList:getWidth() / 4, bttnHeight,
+        self.vehicleSpawnMethodRadioBttn:getBottom() + padding, self.vehiclesCategoriesList:getWidth() / 4, buttonHeight,
         getText("IGUI_VRM_SpawnVehicle"), self.onSpawnVehicles
     );
-    self.spawnManualVehicleButton.borderColor = { r = 0.2, g = 0.6, b = 0.9, a = 1 };
 end
 
 function RespawnControlPanel:onSpawnVehicles()
@@ -983,18 +1109,22 @@ end
 
 function RespawnControlPanel:onResize()
     ISUIElement.onResize(self);
-    local padding = 10;
+    local padding = UI.PADDING.MEDIUM * self.scale;
+    local width = self:getWidth();
+    local oneThirdWidth = width / 3 - 2 * padding;
+    local twoThirdsWidth = 2 * width / 3 - 2 * padding;
 
-    local oneThirdListWidth = self:getWidth() / 3 - 2 * padding;
-    local buttonWidth = (oneThirdListWidth - padding) / 2;
+    self:updateHeaderLayout(padding, width);
+    self:updateListLayout(padding, oneThirdWidth, twoThirdsWidth);
+    self:updateButtonLayout(padding);
+    self:updateCoordinateLayout();
+end
 
-    self.exportButton:setWidth(buttonWidth);
-    self.exportButton:setX(self:getWidth() - buttonWidth - padding);
+function RespawnControlPanel:updateHeaderLayout(padding, width)
+    local buttonWidth = (self:getWidth() / 3 - padding) / 2;
+    local buttonHeight = UI.DIMENSIONS.BUTTON_HEIGHT * self.scale;
 
-    self.importButton:setWidth(buttonWidth);
-    self.importButton:setX(self.exportButton:getX() - buttonWidth - padding);
-
-    self.zoneNameComboBox:setWidth(self:getWidth() * 0.375);
+    self.zoneNameComboBox:setWidth(width * 0.375);
 
     self.addZoneButton:setWidth((self.zoneNameComboBox:getWidth() - padding) / 2);
     self.removeZoneButton:setWidth(self.addZoneButton:getWidth());
@@ -1002,45 +1132,36 @@ function RespawnControlPanel:onResize()
 
     self.zoneOptionsTickBox:setX(self.zoneNameComboBox:getRight() + padding);
 
+    self.importButton:setX(self:getWidth() - buttonWidth - padding);
+    self.importButton:setWidth(buttonWidth);
 
-    local twoThirdsListWidth = self:getWidth() * 2 / 3;
+    self.exportButton:setX(self.importButton:getX() - buttonWidth - padding);
+    self.exportButton:setWidth(buttonWidth);
 
-    self.vehicleCategoriesLabel:setX(padding + twoThirdsListWidth / 4);
-    self.spawnRatesLabel:setX(padding + (twoThirdsListWidth / 4) * 3);
-    self.vehiclesAssignedLabel:setX(self.vehiclesCategoriesList:getRight() + (self:getWidth() / 3 - 2 * padding) / 2);
+    self.coordsErrorLabel:setX(self.importButton:getX() - padding / 2);
+end
 
+function RespawnControlPanel:updateListLayout(padding, oneThirdWidth, twoThirdsWidth)
+    self.vehicleCategoriesLabel:setX(UI.PADDING.MEDIUM + twoThirdsWidth / 4);
+    self.spawnRatesLabel:setX(UI.PADDING.MEDIUM + (twoThirdsWidth / 4) * 3);
+    self.vehiclesCategoriesList:setWidth(twoThirdsWidth);
 
-    self.vehiclesCategoriesList:setWidth(twoThirdsListWidth);
-    self.vehiclesAssignedList:setX(self.vehiclesCategoriesList:getRight());
-    self.vehiclesAssignedList:setWidth(oneThirdListWidth);
+    self.vehiclesAssignedLabel:setX(self.vehiclesCategoriesList:getRight() + oneThirdWidth / 2);
+    self.vehiclesAssignedList:setX(self.vehiclesCategoriesList:getRight() + padding);
+    self.vehiclesAssignedList:setWidth(oneThirdWidth);
 
+    self.blacklistedVehiclesLabel:setX(self.vehiclesCategoriesList:getRight() + oneThirdWidth / 2);
+    self.blacklistedVehiclesList:setWidth(oneThirdWidth);
+    self.blacklistedVehiclesList:setX(self.vehiclesAssignedList:getX());
+end
 
-    local xBase = self:getWidth() - 2 * buttonWidth - 2 * padding;
-    local yBase = self:getWidth() - buttonWidth - padding;
-    local halfPadding = padding / 2;
+function RespawnControlPanel:updateButtonLayout(padding)
+    local buttonWidth = self.vehiclesCategoriesList:getWidth() / 4;
 
-    self.coordsErrorLabel:setX(self.importButton:getRight() + halfPadding);
-
-    for _, element in ipairs({ { self.x1Label, self.x1Input }, { self.x2Label, self.x2Input } }) do
-        element[1]:setX(xBase);
-        element[2]:setX(element[1]:getRight() + padding);
-    end
-
-    for _, element in ipairs({ { self.y1Label, self.y1Input }, { self.y2Label, self.y2Input } }) do
-        element[1]:setX(yBase);
-        element[2]:setX(element[1]:getRight() + padding);
-    end
-
-
-    buttonWidth = self.vehiclesCategoriesList:getWidth() / 4;
     self.addCategoryButton:setWidth(buttonWidth);
+
     self.removeCategoryButton:setWidth(buttonWidth);
     self.removeCategoryButton:setX(self.addCategoryButton:getRight() + padding);
-
-
-    self.setDefaultCategoryButton:setWidth(buttonWidth);
-    self.currentDefaultCategoryLabel:setX(self.setDefaultCategoryButton:getRight() + padding);
-
 
     buttonWidth = (self.vehiclesAssignedList:getWidth() - padding) / 2;
 
@@ -1053,23 +1174,37 @@ function RespawnControlPanel:onResize()
     self.removeVehicleButton:setWidth(buttonWidth);
     self.removeVehicleButton:setX(self.addVehicleButton:getRight() + padding);
 
-
-    self.blacklistedVehiclesLabel:setX(self.addBatchVehiclesButton:getX() + (self:getWidth() / 3 - 2 * padding) / 2);
-
-    self.blacklistedVehiclesList:setWidth(self.vehiclesAssignedList:getWidth());
-    self.blacklistedVehiclesList:setX(self.addBatchVehiclesButton:getX());
-
-
     buttonWidth = (self.blacklistedVehiclesList:getWidth() - padding) / 2;
 
     self.addBlacklistVehicleButton:setWidth(buttonWidth);
-    self.addBlacklistVehicleButton:setX(self.blacklistedVehiclesList:getX());
+    self.addBlacklistVehicleButton:setX(self.vehiclesAssignedList:getX());
 
     self.addBatchBlacklistVehiclesButton:setWidth(buttonWidth);
-    self.addBatchBlacklistVehiclesButton:setX(self.addBlacklistVehicleButton:getX());
+    self.addBatchBlacklistVehiclesButton:setX(self.vehiclesAssignedList:getX());
 
     self.removeBlacklistVehicleButton:setWidth(buttonWidth);
     self.removeBlacklistVehicleButton:setX(self.addBlacklistVehicleButton:getRight() + padding);
+end
+
+function RespawnControlPanel:updateCoordinateLayout()
+    local padding = UI.PADDING.SMALL;
+    local halfPadding = padding / 2;
+
+    for _, element in ipairs({
+        { self.x1Label, self.x1Input },
+        { self.x2Label, self.x2Input }
+    }) do
+        element[1]:setX(self.exportButton:getX());
+        element[2]:setX(element[1]:getRight() + halfPadding);
+    end
+
+    for _, element in ipairs({
+        { self.y1Label, self.y1Input },
+        { self.y2Label, self.y2Input }
+    }) do
+        element[1]:setX(self.x1Input:getRight() + halfPadding);
+        element[2]:setX(element[1]:getRight() + halfPadding);
+    end
 end
 
 function RespawnControlPanel:close()

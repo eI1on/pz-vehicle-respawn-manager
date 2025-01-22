@@ -7,3 +7,11 @@ option VehicleRespawnManager.enableLogging
     page = VehicleRespawnManager,
     translation = VehicleRespawnManager_enableLogging,
 }
+
+option VehicleRespawnManager.engineQuality
+{
+    type = string,
+    default = 1;100,
+    page = VehicleRespawnManager,
+    translation = VehicleRespawnManager_engineQuality,
+}

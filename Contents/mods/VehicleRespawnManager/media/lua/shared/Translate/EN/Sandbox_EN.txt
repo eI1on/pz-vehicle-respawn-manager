@@ -1,7 +1,11 @@
 Sandbox_EN = {
 
     Sandbox_VehicleRespawnManager = "Vehicle Respawn Manager",
+
     Sandbox_VehicleRespawnManager_enableLogging = "Enable Logging",
     Sandbox_VehicleRespawnManager_enableLogging_tooltip = "Turn <SPACE> <RGB:1,0.8,0> ON </RGB> <SPACE> to enable detailed logging. When enabled, the mod records info about spawn events and system operations for troubleshooting and monitoring purposes.",
+
+    VehicleRespawnManager_engineQuality = "Engine Quality",
+    VehicleRespawnManager_engineQuality_tooltip = "The range of engine quality vehicles will spawn with. For example '1;100' will set the engine quality of the spawned vehicle to a random number between 1 and 100. Default=1;100",
 
 }

@@ -3,13 +3,20 @@ local Globals = require("Starlit/Globals");
 local VehicleRespawnManager = {};
 VehicleRespawnManager.Shared = {};
 VehicleRespawnManager.Shared.VehicleScripts = {};
+VehicleRespawnManager.Shared.ExcludedVehicleScripts = {
+    ["Base.ModernCar_Martin"] = true,
+    ["Base.SportsCar_ez"] = true,
+}
 
 function VehicleRespawnManager.Shared.InitVehicleScripts()
     local allScripts = getScriptManager():getAllVehicleScripts();
-    local size = allScripts:size();
-    for i = 1, size do
-        local script = allScripts:get(i - 1);
-        VehicleRespawnManager.Shared.VehicleScripts[script:getFullName()] = true;
+    for i = 0, allScripts:size() - 1 do
+        local script = allScripts:get(i);
+        local scriptName = script:getFullName();
+
+        if not VehicleRespawnManager.Shared.ExcludedVehicleScripts[scriptName] then
+            VehicleRespawnManager.Shared.VehicleScripts[scriptName] = true;
+        end
     end
 end
 

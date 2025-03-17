@@ -1,11 +1,37 @@
 Sandbox_EN = {
+  Sandbox_VehicleRespawnManager = "Vehicle Respawn Manager",
 
-    Sandbox_VehicleRespawnManager = "Vehicle Respawn Manager",
+  Sandbox_VehicleRespawnManager_enableLogging = "Enable Logging",
+  Sandbox_VehicleRespawnManager_enableLogging_tooltip = "Turn <SPACE> <PUSHRGB:1,0.8,0> ON <POPRGB> <SPACE> to activate debug logging for troubleshooting. <BR> Captures spawn successes/failures, zone selections, and system operations in server logs. <BR> <ORANGE> Recommended for diagnosing missing vehicles or spawn conflicts. <RGB:1,1,1>",
 
-    Sandbox_VehicleRespawnManager_enableLogging = "Enable Logging",
-    Sandbox_VehicleRespawnManager_enableLogging_tooltip = "Turn <SPACE> <RGB:1,0.8,0> ON <RGB:1,1,1> <SPACE> to enable detailed logging. When enabled, the mod records info about spawn events and system operations for troubleshooting and monitoring purposes.",
+  Sandbox_VehicleRespawnManager_engineQuality = "Engine Quality",
+  Sandbox_VehicleRespawnManager_engineQuality_tooltip = "Randomized vehicle engine quality range using <SPACE> <RED> Min;Max <RGB:1,1,1> <SPACE>format (e.g., 30;70). <BR> Affects engine power ( <SPACE> <GREEN> +/- 10% <RGB:1,1,1> <SPACE> quality variation), loudness (scaled by zombie attraction), and failure chance. <BR> Default= <GREEN> 1;100 <RGB:1,1,1> <SPACE> provides full randomness from junk to pristine.",
 
-    Sandbox_VehicleRespawnManager_engineQuality = "Engine Quality",
-    Sandbox_VehicleRespawnManager_engineQuality_tooltip = "The range of engine quality vehicles will spawn with. <BR> For example '1;100' will set the engine quality of the spawned vehicle to a random number between 1 and 100. <BR> Default=1;100",
+  Sandbox_VehicleRespawnManager_maxAttemptsRequest = "Max Spawn Attempts per Request",
+  Sandbox_VehicleRespawnManager_maxAttemptsRequest_tooltip = "Retry limit for individual vehicle placements before giving up. <BR> Each attempt checks collisions, safehouse buffers, and valid zones. <BR> <ORANGE> Higher values improve success but may impact performance. <RGB:1,1,1>",
+
+  Sandbox_VehicleRespawnManager_maxAttemptsRandomZone = "Max Random Zone Search Attempts",
+  Sandbox_VehicleRespawnManager_maxAttemptsRandomZone_tooltip = "Maximum number of attempts to find a random vehicle zone when spawning vehicles in global zones. <BR> <ORANGE> Higher values increase chances of finding valid zones but may impact performance. <RGB:1,1,1>",
+
+  Sandbox_VehicleRespawnManager_maxTimedSpawnsProcessed = "Max Timed Spawns Per Tick",
+  Sandbox_VehicleRespawnManager_maxTimedSpawnsProcessed_tooltip = "Maximum number of timed spawn requests processed in a single tick. <BR> <ORANGE> Higher values process more spawns at once but may cause lag spikes. <RGB:1,1,1>",
+
+  Sandbox_VehicleRespawnManager_timedSpawnsDelay = "Timed Spawns Delay",
+  Sandbox_VehicleRespawnManager_timedSpawnsDelay_tooltip = "Cooldown ( <RED> ms <RGB:1,1,1> ) between timed spawn attempts. <BR> <ORANGE> Lower values spawn vehicles faster but may impact performance. <RGB:1,1,1>",
+
+  Sandbox_VehicleRespawnManager_queueProcessInterval = "Queue Process Interval",
+  Sandbox_VehicleRespawnManager_queueProcessInterval_tooltip = "Frequency ( <RED> ms <RGB:1,1,1> ) of spawn queue checks. <BR> Lower intervals reduce vehicle pop-in time but increase baseline CPU usage. <BR> <ORANGE> Recommended <SPACE> <GREEN> 1000-2000ms <ORANGE> <SPACE> for balanced performance.",
+
+  Sandbox_VehicleRespawnManager_safehouseCheckInterval = "Safehouse Check Interval",
+  Sandbox_VehicleRespawnManager_safehouseCheckInterval_tooltip = "Frequency ( <RED> ms <RGB:1,1,1> ) of safehouse boundary scans. <BR> Detects newly added or removed safehouses to compute the exclusion of world-defined vehicle zones around them. <BR> <ORANGE> Lower values detect safehouse changes faster but increase server load. <RGB:1,1,1>",
+
+  Sandbox_VehicleRespawnManager_safehouseBuffer = "Safehouse Buffer Zone",
+  Sandbox_VehicleRespawnManager_safehouseBuffer_tooltip = "Vehicle-free radius ( <RED> tiles <RGB:1,1,1> ) around claimed safehouses. <BR> Prevents spawns in base parking areas. <BR> <ORANGE> Higher values create bigger exclusion zones for world-defined vehicle zones around safehouses. <RGB:1,1,1>",
+
+  Sandbox_VehicleRespawnManager_spawnSquareClearRange = "Spawn Clear Range",
+  Sandbox_VehicleRespawnManager_spawnSquareClearRange_tooltip = "Empty space ( <RED> tiles <RGB:1,1,1> ) required around spawn points. <BR> Checks <SPACE> <GREEN> 5x5 <RGB:1,1,1> <SPACE> area at 2. <BR> <ORANGE> Higher values prevent clustered spawns but make finding valid spawn points harder. <RGB:1,1,1>",
+
+  Sandbox_VehicleRespawnManager_squareLoadDelay = "Square Load Spawn Delay",
+  Sandbox_VehicleRespawnManager_squareLoadDelay_tooltip = "Post-square-load wait ( <RED> ms <RGB:1,1,1> ) before spawning. <BR> Ensures collision meshes and objects are loaded. <BR> <ORANGE> Higher values ensure the square is fully loaded but increase spawn time. <BR> <RGB:1,1,1> Below <SPACE> <RED> 100ms <RGB:1,1,1> <SPACE> risks vehicle burgirs. <RGB:1,1,1>",
 
 }

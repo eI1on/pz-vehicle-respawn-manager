@@ -344,7 +344,7 @@ function VehicleScriptTextBox:new(x, y, width, height, text, defaultEntryText, t
         o:setX(o.x);
     end
     o.name = nil;
-    o.backgroundColor = { r = 0, g = 0, b = 0, a = 0.5 };
+    o.backgroundColor = { r = 0.1, g = 0.1, b = 0.1, a = 0.75 };
     o.borderColor = { r = 0.4, g = 0.4, b = 0.4, a = 1 };
     o.width = width;
     local txtWidth = getTextManager():MeasureStringX(UIFont.Small, text) + 10;

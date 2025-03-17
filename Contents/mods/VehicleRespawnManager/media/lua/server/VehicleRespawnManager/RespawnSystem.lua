@@ -1,10 +1,12 @@
 local Reflection = require("Starlit/utils/Reflection");
 local Globals = require("Starlit/Globals");
+
 local Logger = require("VehicleRespawnManager/Logger");
 
 if Globals.isClient then return; end
 
 local VehicleRespawnManager         = require("VehicleRespawnManager/Shared");
+VehicleRespawnManager.RespawnSystem = {};
 
 local Constants                     = {
     CONFIG = {
@@ -21,7 +23,7 @@ local Constants                     = {
         SAFEHOUSE_BUFFER = 20,
         CELL_SIZE = 300,
 
-        SPAWN_SQUARE_CLEAR_RANGE = 3,
+        SPAWN_SQUARE_CLEAR_RANGE = 2,
         SQUARE_LOAD_DELAY = 500,
 
         DEFAULT_ENGINE_QUALITY = "1;100",
@@ -43,7 +45,7 @@ local Constants                     = {
         rtrafficjame = "E",
         rtrafficjamw = "W"
     }
-}
+};
 
 -- Core classes
 ---@class State
@@ -56,7 +58,7 @@ local State                         = {
     lastSafehouseCheck = 0,
 
     rand = newrandom()
-}
+};
 
 ---@class Zones
 local Zones                         = {
@@ -64,18 +66,13 @@ local Zones                         = {
     globalZones = table.newarray(),
     blacklistZones = table.newarray(),
     nonGlobalZones = table.newarray(),
-}
+};
 
 VehicleRespawnManager.RespawnSystem = {
     Config = Constants.CONFIG,
     State = State,
     Zones = Zones,
-    RequestStatus = Constants.CONFIG.REQUEST_STATUS,
-
-    ModDataManager = {},
-    ZoneManager = {},
-    SpawnManager = {}
-}
+};
 
 local vehicleScripts                = VehicleRespawnManager.Shared.VehicleScripts;
 
@@ -93,6 +90,57 @@ local function initOptions()
     if optionsVars then
         local logLevel = optionsVars.enableLogging and "DEBUG" or "INFO";
         Logger:setLogLevel(logLevel);
+
+        VehicleRespawnManager.RespawnSystem.Config = {
+            REQUEST_STATUS = Constants.CONFIG.REQUEST_STATUS,
+
+            MAX_ATTEMPTS_REQ = optionsVars.maxAttemptsRequest or Constants.CONFIG.MAX_ATTEMPTS_REQ,
+            MAX_ATTEMPTS_RANDOM_VEHICLE_ZONE = optionsVars.maxAttemptsRandomZone or
+            Constants.CONFIG.MAX_ATTEMPTS_RANDOM_VEHICLE_ZONE,
+
+            MAX_TIMED_SPAWNS_PROCESSED = optionsVars.maxTimedSpawnsProcessed or
+            Constants.CONFIG.MAX_TIMED_SPAWNS_PROCESSED,
+            TIMED_SPAWNS_SPAWN_DELAY = optionsVars.timedSpawnsDelay or Constants.CONFIG.TIMED_SPAWNS_SPAWN_DELAY,
+
+            QUEUE_PROCESS_INTERVAL = optionsVars.queueProcessInterval or Constants.CONFIG.QUEUE_PROCESS_INTERVAL,
+
+            SAFEHOUSE_CHECK_INTERVAL = optionsVars.safehouseCheckInterval or Constants.CONFIG.SAFEHOUSE_CHECK_INTERVAL,
+
+            SAFEHOUSE_BUFFER = optionsVars.safehouseBuffer or Constants.CONFIG.SAFEHOUSE_BUFFER,
+            CELL_SIZE = Constants.CONFIG.CELL_SIZE,
+
+            SPAWN_SQUARE_CLEAR_RANGE = optionsVars.spawnSquareClearRange or Constants.CONFIG.SPAWN_SQUARE_CLEAR_RANGE,
+            SQUARE_LOAD_DELAY = optionsVars.squareLoadDelay or Constants.CONFIG.SQUARE_LOAD_DELAY,
+
+            DEFAULT_ENGINE_QUALITY = optionsVars.engineQuality or Constants.CONFIG.DEFAULT_ENGINE_QUALITY,
+        };
+
+        Logger:debug("Initialized VehicleRespawnManager with configuration:");
+        Logger:debug("- MAX_ATTEMPTS_REQ: %d", VehicleRespawnManager.RespawnSystem.Config.MAX_ATTEMPTS_REQ);
+        Logger:debug("- MAX_ATTEMPTS_RANDOM_VEHICLE_ZONE: %d",
+            VehicleRespawnManager.RespawnSystem.Config.MAX_ATTEMPTS_RANDOM_VEHICLE_ZONE);
+        Logger:debug("- MAX_TIMED_SPAWNS_PROCESSED: %d",
+            VehicleRespawnManager.RespawnSystem.Config.MAX_TIMED_SPAWNS_PROCESSED);
+        Logger:debug("- TIMED_SPAWNS_SPAWN_DELAY: %d",
+            VehicleRespawnManager.RespawnSystem.Config.TIMED_SPAWNS_SPAWN_DELAY);
+        Logger:debug("- QUEUE_PROCESS_INTERVAL: %d", VehicleRespawnManager.RespawnSystem.Config.QUEUE_PROCESS_INTERVAL);
+        Logger:debug("- SAFEHOUSE_CHECK_INTERVAL: %d",
+            VehicleRespawnManager.RespawnSystem.Config.SAFEHOUSE_CHECK_INTERVAL);
+        Logger:debug("- SAFEHOUSE_BUFFER: %d", VehicleRespawnManager.RespawnSystem.Config.SAFEHOUSE_BUFFER);
+        Logger:debug("- SPAWN_SQUARE_CLEAR_RANGE: %d",
+            VehicleRespawnManager.RespawnSystem.Config.SPAWN_SQUARE_CLEAR_RANGE);
+        Logger:debug("- SQUARE_LOAD_DELAY: %d", VehicleRespawnManager.RespawnSystem.Config.SQUARE_LOAD_DELAY);
+        Logger:debug("- DEFAULT_ENGINE_QUALITY: %s", VehicleRespawnManager.RespawnSystem.Config.DEFAULT_ENGINE_QUALITY);
+    else
+        Logger:warning("Sandbox options not available, using default configuration");
+    end
+
+    local globalModData = VehicleRespawnManager.RespawnSystem.getModData();
+    if globalModData.LastRequestId == 0 then
+        globalModData.SpawnRequestsQueue = {};
+        globalModData.LocationPendingSpawns = {};
+        globalModData.TimedSpawns = {};
+        globalModData.RequestsById = {};
     end
 end
 
@@ -106,9 +154,11 @@ local function formatRequest(ctx)
     addField("id", "%s", ctx.id)
     addField("type", "%s", ctx.type)
     addField("status", "%s", ctx.status)
+    addField("timestamp", "%s", ctx.timestamp)
     addField("attempt", "%d", ctx.attempt)
     addField("zone", "%s", ctx.zone)
     addField("fixedScript", "%s", ctx.fixedScript)
+    addField("vehicleScript", "%s", ctx.vehicleScript)
     addField("vehicle", "%s", ctx.vehicle)
     addField("direction", "%s", ctx.direction)
     if ctx.x ~= nil and ctx.y ~= nil then
@@ -117,7 +167,7 @@ local function formatRequest(ctx)
     return table.concat(parts);
 end
 
-function VehicleRespawnManager.RespawnSystem.ModDataManager.getModData()
+VehicleRespawnManager.RespawnSystem.getModData = function()
     local globalModData = ModData.getOrCreate("VehicleRespawnManagerData");
     globalModData.SpawnRequestsQueue = globalModData.SpawnRequestsQueue or {};
     globalModData.LocationPendingSpawns = globalModData.LocationPendingSpawns or {};
@@ -127,22 +177,30 @@ function VehicleRespawnManager.RespawnSystem.ModDataManager.getModData()
     return globalModData;
 end
 
-function VehicleRespawnManager.RespawnSystem.ModDataManager.CleanupOldRequests(maxAge)
-    maxAge = maxAge or (7 * 24 * 60 * 60 * 1000); -- Default 7 days in milliseconds
+-- local globalModData = ModData.getOrCreate("VehicleRespawnManagerData");
+-- globalModData.SpawnRequestsQueue = {};
+-- globalModData.LocationPendingSpawns = {};
+-- globalModData.TimedSpawns = {};
+-- globalModData.LastRequestId = 0;
+-- globalModData.RequestsById = {};
+
+
+VehicleRespawnManager.RespawnSystem.CleanupOldRequests = function(maxAge)
+    maxAge = maxAge or (24 * 60 * 60 * 1000);
     local currentTime = getTimestamp();
-    local globalModData = VehicleRespawnManager.RespawnSystem.ModDataManager.getModData();
+    local globalModData = VehicleRespawnManager.RespawnSystem.getModData();
 
     for requestId, request in pairs(globalModData.RequestsById) do
-        if (request.status == Constants.CONFIG.REQUEST_STATUS.COMPLETED or
-                request.status == Constants.CONFIG.REQUEST_STATUS.FAILED) and
-            (currentTime - request.timestamp > maxAge) then
+        local age = currentTime - (request.timestamp or 0);
+        if age > maxAge then
             globalModData.RequestsById[requestId] = nil;
+            Logger:debug("Cleaned up old request: %s", formatRequest(request));
         end
     end
 end
 
 Events.EveryDays.Add(function()
-    VehicleRespawnManager.RespawnSystem.ModDataManager.CleanupOldRequests()
+    VehicleRespawnManager.RespawnSystem.CleanupOldRequests();
 end)
 
 
@@ -150,11 +208,11 @@ end)
 -- Zone Initialization & Category Processing
 -----------------------------------------------------
 
-function VehicleRespawnManager.RespawnSystem.ZoneManager.initZones()
+function VehicleRespawnManager.RespawnSystem.initZones()
     local originalZones = VehicleRespawnManager.Shared.RequestZones() or {};
-    local zones = copyTable(originalZones);
+    local zones         = copyTable(originalZones);
 
-    Zones = {
+    Zones               = {
         globalBlacklistZones = table.newarray(),
         globalZones = table.newarray(),
         blacklistZones = table.newarray(),
@@ -162,33 +220,32 @@ function VehicleRespawnManager.RespawnSystem.ZoneManager.initZones()
     };
 
     for i = 1, #zones do
-        VehicleRespawnManager.RespawnSystem.ZoneManager.processZone(zones[i]);
+        VehicleRespawnManager.RespawnSystem.processZone(zones[i]);
     end
 end
 
-function VehicleRespawnManager.RespawnSystem.ZoneManager.processZone(zone)
+function VehicleRespawnManager.RespawnSystem.processZone(zone)
     if zone.useDefaultCategoryForUnassigned then
-        VehicleRespawnManager.RespawnSystem.ZoneManager.handleDefaultCategory(zone);
+        VehicleRespawnManager.RespawnSystem.handleDefaultCategory(zone);
     end
-
-    VehicleRespawnManager.RespawnSystem.ZoneManager.categorizeZone(zone);
+    VehicleRespawnManager.RespawnSystem.categorizeZone(zone);
 end
 
-function VehicleRespawnManager.RespawnSystem.ZoneManager.handleDefaultCategory(zone)
+function VehicleRespawnManager.RespawnSystem.handleDefaultCategory(zone)
     local defaultCatName = zone.defaultCategoryNameForUnassigned;
     if not (defaultCatName and defaultCatName ~= "None") then return; end
 
     local categories = zone.vehicleSpawnCategories;
     if not categories then return; end
 
-    local defaultCategory, assignedVehicles = VehicleRespawnManager.RespawnSystem.ZoneManager.findDefaultCategory(
-    categories, defaultCatName);
+    local defaultCategory, assignedVehicles = VehicleRespawnManager.RespawnSystem.findDefaultCategory(categories,
+        defaultCatName);
     if defaultCategory then
-        VehicleRespawnManager.RespawnSystem.ZoneManager.assignUnassignedVehicles(zone, defaultCategory, assignedVehicles);
+        VehicleRespawnManager.RespawnSystem.assignUnassignedVehicles(zone, defaultCategory, assignedVehicles);
     end
 end
 
-function VehicleRespawnManager.RespawnSystem.ZoneManager.findDefaultCategory(categories, defaultCatName)
+function VehicleRespawnManager.RespawnSystem.findDefaultCategory(categories, defaultCatName)
     local defaultCategory = nil;
     local assignedVehicles = {};
 
@@ -206,18 +263,17 @@ function VehicleRespawnManager.RespawnSystem.ZoneManager.findDefaultCategory(cat
     return defaultCategory, assignedVehicles;
 end
 
-function VehicleRespawnManager.RespawnSystem.ZoneManager.assignUnassignedVehicles(zone, defaultCategory, assignedVehicles)
-    local defaultVehicles = defaultCategory.vehicles or {};
-    defaultCategory.vehicles = defaultVehicles;
+function VehicleRespawnManager.RespawnSystem.assignUnassignedVehicles(zone, defaultCategory, assignedVehicles)
+    defaultCategory.vehicles = defaultCategory.vehicles or {};
 
     for scriptName in pairs(vehicleScripts) do
         if not assignedVehicles[scriptName] and not zone.zoneVehicleBlacklist[scriptName] then
-            defaultVehicles[scriptName] = true;
+            defaultCategory.vehicles[scriptName] = true;
         end
     end
 end
 
-function VehicleRespawnManager.RespawnSystem.ZoneManager.categorizeZone(zone)
+function VehicleRespawnManager.RespawnSystem.categorizeZone(zone)
     if zone.isBlacklistZone then
         if zone.isGlobalZone then
             table.insert(Zones.globalBlacklistZones, zone);
@@ -234,7 +290,7 @@ function VehicleRespawnManager.RespawnSystem.ZoneManager.categorizeZone(zone)
 end
 
 Events.OnInitGlobalModData.Add(function()
-    VehicleRespawnManager.RespawnSystem.ZoneManager.initZones();
+    VehicleRespawnManager.RespawnSystem.initZones();
     initOptions();
 end);
 
@@ -243,7 +299,7 @@ end);
 -----------------------------------------------------
 
 -- Utility function to check if a vehicle zone is within a buffer zone of any safehouse
-function VehicleRespawnManager.RespawnSystem.ZoneManager.IsZoneNearSafehouse(zone)
+function VehicleRespawnManager.RespawnSystem.IsZoneNearSafehouse(zone)
     local zoneX1 = zone:getX();
     local zoneY1 = zone:getY();
     local zoneX2 = zoneX1 + zone:getWidth();
@@ -270,7 +326,7 @@ function VehicleRespawnManager.RespawnSystem.ZoneManager.IsZoneNearSafehouse(zon
     return false;
 end
 
-function VehicleRespawnManager.RespawnSystem.ZoneManager.GetWorldZonesForCellAt(cellx, celly)
+function VehicleRespawnManager.RespawnSystem.GetWorldZonesForCellAt(cellx, celly)
     local cacheY = VehicleRespawnManager.RespawnSystem.State.cachedWorldZonesByCell[celly];
     if cacheY then
         local cacheX = cacheY[cellx];
@@ -295,12 +351,12 @@ function VehicleRespawnManager.RespawnSystem.ZoneManager.GetWorldZonesForCellAt(
         if substring == "zombie.iso.IsoMetaGrid$VehicleZone" then
             local zoneName = zone:getName();
             local zoneDir = zone.dir;
-            if VehicleRespawnManager.RespawnSystem.Config.WORLD_VEHICLE_ZONES_DIRECTIONS[zoneName] then
-                zoneDir = VehicleRespawnManager.RespawnSystem.Config.WORLD_VEHICLE_ZONES_DIRECTIONS[zoneName];
+            if Constants.WORLD_VEHICLE_ZONES_DIRECTIONS[zoneName] then
+                zoneDir = Constants.WORLD_VEHICLE_ZONES_DIRECTIONS[zoneName];
             end
 
             -- check if the zone is near any safehouse; if so, skip it
-            if not VehicleRespawnManager.RespawnSystem.ZoneManager.IsZoneNearSafehouse(zone) then
+            if not VehicleRespawnManager.RespawnSystem.IsZoneNearSafehouse(zone) then
                 table.insert(cellVehicleZones, { zone = zone, direction = zoneDir });
             end
         end
@@ -310,17 +366,17 @@ function VehicleRespawnManager.RespawnSystem.ZoneManager.GetWorldZonesForCellAt(
     return cellVehicleZones;
 end
 
-function VehicleRespawnManager.RespawnSystem.ZoneManager.RecacheCellsForSafehouses(safehouses)
+function VehicleRespawnManager.RespawnSystem.RecacheCellsForSafehouses(safehouses)
     for i = 1, #safehouses do
         local safe = safehouses[i];
         local minCellX = math.floor((safe.x - VehicleRespawnManager.RespawnSystem.Config.SAFEHOUSE_BUFFER) /
-            VehicleRespawnManager.RespawnSystem.Config.CELL_SIZE);
+        VehicleRespawnManager.RespawnSystem.Config.CELL_SIZE);
         local maxCellX = math.floor((safe.x + safe.w + VehicleRespawnManager.RespawnSystem.Config.SAFEHOUSE_BUFFER) /
-            VehicleRespawnManager.RespawnSystem.Config.CELL_SIZE);
+        VehicleRespawnManager.RespawnSystem.Config.CELL_SIZE);
         local minCellY = math.floor((safe.y - VehicleRespawnManager.RespawnSystem.Config.SAFEHOUSE_BUFFER) /
-            VehicleRespawnManager.RespawnSystem.Config.CELL_SIZE);
+        VehicleRespawnManager.RespawnSystem.Config.CELL_SIZE);
         local maxCellY = math.floor((safe.y + safe.h + VehicleRespawnManager.RespawnSystem.Config.SAFEHOUSE_BUFFER) /
-            VehicleRespawnManager.RespawnSystem.Config.CELL_SIZE);
+        VehicleRespawnManager.RespawnSystem.Config.CELL_SIZE);
         local cellX, cellY, cachedRow;
 
         for x = minCellX, maxCellX do
@@ -335,7 +391,7 @@ function VehicleRespawnManager.RespawnSystem.ZoneManager.RecacheCellsForSafehous
     end
 end
 
-function VehicleRespawnManager.RespawnSystem.ZoneManager.DetectSafehouseChanges()
+function VehicleRespawnManager.RespawnSystem.DetectSafehouseChanges()
     local currentSafehouses = {};
     local safehouseList = SafeHouse.getSafehouseList();
 
@@ -370,33 +426,25 @@ function VehicleRespawnManager.RespawnSystem.ZoneManager.DetectSafehouseChanges(
     return addedSafehouses, removedSafehouses, currentSafehouses;
 end
 
-local function pluck(tbl, key)
-    local result = {};
-    for i = 1, #tbl do
-        table.insert(result, tbl[i][key]);
-    end
-    return result;
-end
-
-function VehicleRespawnManager.RespawnSystem.ZoneManager.HandleSafehouseChanges()
-    local addedSafehouses, removedSafehouses, currentSafehouses = VehicleRespawnManager.RespawnSystem.ZoneManager
+function VehicleRespawnManager.RespawnSystem.HandleSafehouseChanges()
+    local addedSafehouses, removedSafehouses, currentSafehouses = VehicleRespawnManager.RespawnSystem
     .DetectSafehouseChanges();
 
-    local changeLog = string.format(
-        "Safehouse changes - added=%d removed=%d total=%d",
-        #addedSafehouses,
-        #removedSafehouses,
-        SafeHouse.getSafehouseList():size()
-    );
+    if #addedSafehouses > 0 or #removedSafehouses > 0 then
+        Logger:info(string.format(
+            "Safehouse changes - added=%d removed=%d total=%d",
+            #addedSafehouses,
+            #removedSafehouses,
+            SafeHouse.getSafehouseList():size()
+        ));
 
-    if #addedSafehouses > 0 then
-        VehicleRespawnManager.RespawnSystem.ZoneManager.RecacheCellsForSafehouses(addedSafehouses);
-        Logger:info("%s Added: %s", changeLog, table.concat(pluck(addedSafehouses, "id"), ","));
-    end
+        if #addedSafehouses > 0 then
+            VehicleRespawnManager.RespawnSystem.RecacheCellsForSafehouses(addedSafehouses);
+        end
 
-    if #removedSafehouses > 0 then
-        VehicleRespawnManager.RespawnSystem.ZoneManager.RecacheCellsForSafehouses(removedSafehouses);
-        Logger:info("%s Removed: %s", changeLog, table.concat(pluck(removedSafehouses, "id"), ","));
+        if #removedSafehouses > 0 then
+            VehicleRespawnManager.RespawnSystem.RecacheCellsForSafehouses(removedSafehouses);
+        end
     end
 
     VehicleRespawnManager.RespawnSystem.State.safehouseState = currentSafehouses;
@@ -408,18 +456,18 @@ Events.EveryOneMinute.Add(function()
     if currentTime - lastCheckedTime < VehicleRespawnManager.RespawnSystem.Config.SAFEHOUSE_CHECK_INTERVAL then return; end
 
     lastCheckedTime = currentTime;
-    VehicleRespawnManager.RespawnSystem.ZoneManager.HandleSafehouseChanges();
+    VehicleRespawnManager.RespawnSystem.HandleSafehouseChanges();
 end)
 
 -----------------------------------------------------
 -- Zone & Category Selection Logic
 -----------------------------------------------------
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.IsWater(square)
+function VehicleRespawnManager.RespawnSystem.IsWater(square)
     return square:Is(IsoFlagType.water);
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.IsSquareValid(square)
+function VehicleRespawnManager.RespawnSystem.IsSquareValid(square)
     local x = square:getX();
     local y = square:getY();
     local range = VehicleRespawnManager.RespawnSystem.Config.SPAWN_SQUARE_CLEAR_RANGE;
@@ -457,7 +505,7 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.IsSquareValid(square)
     return true;
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.CountVehiclesInZone(zone)
+function VehicleRespawnManager.RespawnSystem.CountVehiclesInZone(zone)
     local cell = getCell();
     if not cell then return 0; end
 
@@ -478,7 +526,7 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.CountVehiclesInZone(zo
     return count;
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.ChooseVehicleCategory(zone)
+function VehicleRespawnManager.RespawnSystem.ChooseVehicleCategory(zone)
     local categories = zone.vehicleSpawnCategories or {};
     local totalRate = 0;
     for _, cat in pairs(categories) do
@@ -504,7 +552,7 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.ChooseVehicleCategory(
     return nil;
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.ChooseVehicleFromCategory(category, zoneVehicleBlacklist)
+function VehicleRespawnManager.RespawnSystem.ChooseVehicleFromCategory(category, zoneVehicleBlacklist)
     local validVehicles = table.newarray() --[[@as table]]
     for vName in pairs(category.vehicles or {}) do
         if vehicleScripts[vName] and not zoneVehicleBlacklist[vName] then
@@ -521,7 +569,7 @@ end
 -- 1. global blacklist (if exists, no spawn at all)
 -- 2. global zones (first global zone)
 -- 3. Non-global zones
-function VehicleRespawnManager.RespawnSystem.SpawnManager.SelectZone()
+function VehicleRespawnManager.RespawnSystem.SelectZone()
     if #Zones.globalBlacklistZones > 0 then
         return nil, "globalBlacklistZones";
     end
@@ -536,7 +584,7 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.SelectZone()
 end
 
 -- This tries random cells until it finds at least one world vehicle zone
-function VehicleRespawnManager.RespawnSystem.SpawnManager.GetRandomWorldVehicleZone()
+function VehicleRespawnManager.RespawnSystem.GetRandomWorldVehicleZone()
     local world = getWorld();
     local grid = world:getMetaGrid();
     local minX = grid:getMinX();
@@ -550,27 +598,25 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.GetRandomWorldVehicleZ
     for _ = 1, VehicleRespawnManager.RespawnSystem.Config.MAX_ATTEMPTS_RANDOM_VEHICLE_ZONE do
         local randomCellX = VehicleRespawnManager.RespawnSystem.State.rand:random(minX, maxX);
         local randomCellY = VehicleRespawnManager.RespawnSystem.State.rand:random(minY, maxY);
-        local zones = VehicleRespawnManager.RespawnSystem.ZoneManager.GetWorldZonesForCellAt(randomCellX, randomCellY);
-        if #zones > 0 then
-            return zones[VehicleRespawnManager.RespawnSystem.State.rand:random(1, #zones)];
-        end
+        local zones = VehicleRespawnManager.RespawnSystem.GetWorldZonesForCellAt(randomCellX, randomCellY);
+        if #zones > 0 then return zones[VehicleRespawnManager.RespawnSystem.State.rand:random(1, #zones)]; end
     end
     return nil;
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.IsPointInZone(x, y, zone)
+function VehicleRespawnManager.RespawnSystem.IsPointInZone(x, y, zone)
     if not zone.coordinates then return false; end
 
     local coords = zone.coordinates;
     return x >= coords.x1 and x <= coords.x2 and y >= coords.y1 and y <= coords.y2;
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.FindSpawnCoordinates(zone, maxAttempts)
+function VehicleRespawnManager.RespawnSystem.FindSpawnCoordinates(zone, maxAttempts)
     maxAttempts = maxAttempts or VehicleRespawnManager.RespawnSystem.Config.MAX_ATTEMPTS_REQ;
 
     -- if this is a global zone, ignore the player-defined coordinates and pick from a random world zone
     if zone.isGlobalZone then
-        local randomWorldZoneData = VehicleRespawnManager.RespawnSystem.SpawnManager.GetRandomWorldVehicleZone();
+        local randomWorldZoneData = VehicleRespawnManager.RespawnSystem.GetRandomWorldVehicleZone();
         if not randomWorldZoneData then return "globalCoords", nil; end
 
         local randomWorldZone = randomWorldZoneData.zone;
@@ -580,17 +626,17 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.FindSpawnCoordinates(z
         local vwzY = randomWorldZone:getY();
         local vwzW = randomWorldZone:getWidth();
         local vwzH = randomWorldZone:getHeight();
-        local vwzX2 = vwzX + vwzW - 1;
-        local vwzY2 = vwzY + vwzH - 1;
+        local vwzX2 = vwzX + vwzW;
+        local vwzY2 = vwzY + vwzH;
 
         for _ = 1, maxAttempts do
-            local x = VehicleRespawnManager.RespawnSystem.State.rand:random(vwzX, vwzX2 + 1);
-            local y = VehicleRespawnManager.RespawnSystem.State.rand:random(vwzY, vwzY2 + 1);
+            local x = VehicleRespawnManager.RespawnSystem.State.rand:random(vwzX, vwzX2);
+            local y = VehicleRespawnManager.RespawnSystem.State.rand:random(vwzY, vwzY2);
 
             local isInBlacklist = false;
             for i = 1, #Zones.blacklistZones do
                 local blacklistZone = Zones.blacklistZones[i];
-                if VehicleRespawnManager.RespawnSystem.SpawnManager.IsPointInZone(x, y, blacklistZone) then
+                if VehicleRespawnManager.RespawnSystem.IsPointInZone(x, y, blacklistZone) then
                     isInBlacklist = true;
                     break;
                 end
@@ -622,7 +668,7 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.FindSpawnCoordinates(z
 
     for cx = minCellX, maxCellX do
         for cy = minCellY, maxCellY do
-            local vehicleWorldZones = VehicleRespawnManager.RespawnSystem.ZoneManager.GetWorldZonesForCellAt(cx, cy);
+            local vehicleWorldZones = VehicleRespawnManager.RespawnSystem.GetWorldZonesForCellAt(cx, cy);
             for i = 1, #vehicleWorldZones do
                 local vwz = vehicleWorldZones[i].zone;
                 local vwzX = vwz:getX();
@@ -662,11 +708,11 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.FindSpawnCoordinates(z
         local y = VehicleRespawnManager.RespawnSystem.State.rand:random(chosen.y1, chosen.y2 + 1);
         local square = cell:getOrCreateGridSquare(x, y, 0);
 
-        if square and square:getChunk() ~= nil and VehicleRespawnManager.RespawnSystem.SpawnManager.IsSquareValid(square) and not VehicleRespawnManager.RespawnSystem.SpawnManager.IsWater(square) then
+        if square and square:getChunk() ~= nil and VehicleRespawnManager.RespawnSystem.IsSquareValid(square) and not VehicleRespawnManager.RespawnSystem.IsWater(square) then
             local isInBlacklist = false;
             for i = 1, #Zones.blacklistZones do
                 local blacklistZone = Zones.blacklistZones[i];
-                if VehicleRespawnManager.RespawnSystem.SpawnManager.IsPointInZone(x, y, blacklistZone) then
+                if VehicleRespawnManager.RespawnSystem.IsPointInZone(x, y, blacklistZone) then
                     isInBlacklist = true;
                     break;
                 end
@@ -704,7 +750,7 @@ local function parseIntervalString(intervalString)
     return minEngineQuality, maxEngineQuality;
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.SpawnVehicleAt(spawnRequestData)
+function VehicleRespawnManager.RespawnSystem.SpawnVehicleAt(spawnRequestData)
     local logBase = formatRequest(spawnRequestData);
 
     local canSpawn, reason = true, nil;
@@ -723,7 +769,7 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.SpawnVehicleAt(spawnRe
         canSpawn, reason = false, "chunkNotLoaded";
     end
 
-    if not VehicleRespawnManager.RespawnSystem.SpawnManager.IsSquareValid(square) then
+    if not VehicleRespawnManager.RespawnSystem.IsSquareValid(square) then
         canSpawn, reason = false, "occupied";
     end
 
@@ -779,16 +825,19 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.SpawnVehicleAt(spawnRe
             enginePower
         ))
     else
-        Logger:warn("%s Spawn failed: %s", logBase, reason);
+        Logger:warning("%s Spawn failed: %s", logBase, reason);
     end
 
-    if spawnRequestData.requestId then
-        local globalModData = VehicleRespawnManager.RespawnSystem.ModDataManager.getModData()
-        local request = globalModData.RequestsById[spawnRequestData.requestId];
+    if spawnRequestData.id then
+        local globalModData = VehicleRespawnManager.RespawnSystem.getModData();
+        local request = globalModData.RequestsById[spawnRequestData.id];
         if request then
-            request.status = canSpawn and Constants.CONFIG.REQUEST_STATUS.COMPLETED or
-                Constants.CONFIG.REQUEST_STATUS.FAILED;
-            request.failureReason = reason;
+            if canSpawn then
+                globalModData.RequestsById[spawnRequestData.id] = nil;
+            else
+                request.status = Constants.CONFIG.REQUEST_STATUS.FAILED;
+                request.failureReason = reason;
+            end
         end
     end
 
@@ -796,12 +845,14 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.SpawnVehicleAt(spawnRe
 end
 
 -- Process a single spawn request from the queue
-function VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessRequest(req)
-    local globalModData = VehicleRespawnManager.RespawnSystem.ModDataManager.getModData();
+function VehicleRespawnManager.RespawnSystem.ProcessRequest(req)
+    local globalModData = VehicleRespawnManager.RespawnSystem.getModData();
     local request = globalModData.RequestsById[req.id];
     if not request then return; end
 
     request.status = Constants.CONFIG.REQUEST_STATUS.PROCESSING;
+    request.timestamp = getTimestamp();
+
     request.attempt = request.attempt or 0;
     request.attempt = request.attempt + 1;
     if request.attempt > VehicleRespawnManager.RespawnSystem.Config.MAX_ATTEMPTS_REQ then
@@ -812,9 +863,9 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessRequest(req)
         return;
     end
 
-    local zone, zoneType = VehicleRespawnManager.RespawnSystem.SpawnManager.SelectZone();
+    local zone, zoneType = VehicleRespawnManager.RespawnSystem.SelectZone();
     if not zone then
-        Logger:warn(
+        Logger:warning(
             "%s Zone selection failed: #globalZones=%d #nonGlobalZones=%d #globalBlacklistZones=%d. Requeuing.",
             formatRequest(request), #Zones.globalZones, #Zones.nonGlobalZones, #Zones.globalBlacklistZones
         );
@@ -824,15 +875,15 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessRequest(req)
     local zoneName = zone.name or "UnnamedZone";
 
     local maxCount = zone.maxVehicleCount or 999;
-    local currentCount = VehicleRespawnManager.RespawnSystem.SpawnManager.CountVehiclesInZone(zone);
+    local currentCount = VehicleRespawnManager.RespawnSystem.CountVehiclesInZone(zone);
     if currentCount >= maxCount then return "REQUEUE"; end
-    Logger:debug("%s Selected zone: %s (maxCount=%d currentCount=%d)", formatRequest(request), zone.name, maxCount,
-        currentCount);
+    Logger:debug("%s Selected zone=%s, type=%s (maxCount=%d currentCount=%d)", formatRequest(request), zone.name,
+        zoneType, maxCount, currentCount);
 
     local vehicleScript = request.fixedScript;
     local categoryName = "NoCategory";
     if not vehicleScript then
-        local category = VehicleRespawnManager.RespawnSystem.SpawnManager.ChooseVehicleCategory(zone);
+        local category = VehicleRespawnManager.RespawnSystem.ChooseVehicleCategory(zone);
         if not category and zone.useDefaultCategoryForUnassigned and zone.defaultCategoryNameForUnassigned then
             for _, catData in pairs(zone.vehicleSpawnCategories or {}) do
                 if catData.name == zone.defaultCategoryNameForUnassigned then
@@ -845,7 +896,7 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessRequest(req)
         if not category then return "REQUEUE"; end
 
         categoryName = category.name;
-        vehicleScript = VehicleRespawnManager.RespawnSystem.SpawnManager.ChooseVehicleFromCategory(category,
+        vehicleScript = VehicleRespawnManager.RespawnSystem.ChooseVehicleFromCategory(category,
             zone.zoneVehicleBlacklist);
         if not vehicleScript then
             Logger:debug(
@@ -866,7 +917,7 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessRequest(req)
         end
     end
 
-    local coordsType, spawnCoords = VehicleRespawnManager.RespawnSystem.SpawnManager.FindSpawnCoordinates(zone);
+    local coordsType, spawnCoords = VehicleRespawnManager.RespawnSystem.FindSpawnCoordinates(zone);
     local direction = "Max";
 
     if spawnCoords and spawnCoords.direction then direction = tostring(spawnCoords.direction); end
@@ -879,7 +930,7 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessRequest(req)
             vehicleScript = vehicleScript,
             x = spawnCoords.x,
             y = spawnCoords.y,
-            time = getTimestamp() + VehicleRespawnManager.RespawnSystem.Config.TIMED_SPAWNS_SPAWN_DELAY,
+            timestamp = getTimestamp() + VehicleRespawnManager.RespawnSystem.Config.TIMED_SPAWNS_SPAWN_DELAY,
             attempt = request.attempt,
             direction = direction,
             status = Constants.CONFIG.REQUEST_STATUS.PROCESSING
@@ -896,19 +947,20 @@ end
 -----------------------------------------------------
 -- Periodic Processing
 -----------------------------------------------------
-function VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessQueues()
+function VehicleRespawnManager.RespawnSystem.ProcessQueues()
     local now = getTimestamp();
     if now - VehicleRespawnManager.RespawnSystem.State.lastQueueProcessTime < VehicleRespawnManager.RespawnSystem.Config.QUEUE_PROCESS_INTERVAL then
         return;
     end
     VehicleRespawnManager.RespawnSystem.State.lastQueueProcessTime = now;
 
-    local globalModData = VehicleRespawnManager.RespawnSystem.ModDataManager.getModData();
+    local globalModData = VehicleRespawnManager.RespawnSystem.getModData();
 
     if #globalModData.SpawnRequestsQueue > 0 then
         local request = table.remove(globalModData.SpawnRequestsQueue, 1);
-        local action = VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessRequest(request);
+        local action = VehicleRespawnManager.RespawnSystem.ProcessRequest(request);
         if action == "REQUEUE" then
+            request.status = Constants.CONFIG.REQUEST_STATUS.PENDING;
             table.insert(globalModData.SpawnRequestsQueue, request);
         end
     end
@@ -920,39 +972,46 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessQueues()
         end
 
         local spawnRequestData = globalModData.TimedSpawns[i];
-        if now >= spawnRequestData.time then
-            local canSpawn, reason = VehicleRespawnManager.RespawnSystem.SpawnManager.SpawnVehicleAt(spawnRequestData);
+        if now >= spawnRequestData.timestamp then
+            local canSpawn, reason = VehicleRespawnManager.RespawnSystem.SpawnVehicleAt(spawnRequestData);
             if canSpawn then
                 table.remove(globalModData.TimedSpawns, i);
             else
                 spawnRequestData.attempt = spawnRequestData.attempt + 1;
                 if spawnRequestData.attempt > VehicleRespawnManager.RespawnSystem.Config.MAX_ATTEMPTS_REQ then
-                    spawnRequestData.status = Constants.CONFIG.REQUEST_STATUS.FAILED;
-                    spawnRequestData.failureReason = "MAX_ATTEMPTS_EXCEEDED";
+                    local request = table.remove(globalModData.TimedSpawns, i);
+
+                    request.status = Constants.CONFIG.REQUEST_STATUS.FAILED;
+                    request.failureReason = "MAX_ATTEMPTS_EXCEEDED";
 
                     table.remove(globalModData.TimedSpawns, i);
 
-                    Logger:debug("%s Processing request failed. Reason: %s", formatRequest(spawnRequestData),
-                        spawnRequestData.failureReason);
+                    Logger:debug("%s Processing request failed. Reason: %s", formatRequest(request),
+                        request.failureReason);
                 else
                     if reason == "noCell" or reason == "chunkNotLoaded" or reason == "noSquare" then
-                        local key = spawnRequestData.x .. "_" .. spawnRequestData.y;
-                        globalModData.LocationPendingSpawns[key] = spawnRequestData;
-                        table.remove(globalModData.TimedSpawns, i);
+                        local request = table.remove(globalModData.TimedSpawns, i);
 
-                        Logger:debug("%s Timed Spawn moved to Location Pending Spawn. Reason: %s",
-                            formatRequest(spawnRequestData), reason);
+                        request.status = VehicleRespawnManager.RespawnSystem.Config.REQUEST_STATUS.PENDING;
+                        request.timestamp = getTimestamp();
+
+                        local key = request.x .. "_" .. request.y;
+                        globalModData.LocationPendingSpawns[key] = request;
+
+                        Logger:debug("%s Timed Spawn moved to Location Pending Spawn. Reason: %s", formatRequest(request),
+                            reason);
                     elseif reason == "occupied" then
-                        table.remove(globalModData.TimedSpawns, i);
+                        local request = table.remove(globalModData.TimedSpawns, i);
 
-                        local request = spawnRequestData;
                         request.status = VehicleRespawnManager.RespawnSystem.Config.REQUEST_STATUS.PENDING;
                         request.timestamp = getTimestamp();
 
                         table.insert(globalModData.SpawnRequestsQueue, request);
+
+                        Logger:debug("%s Timed Spawn Requeued. Reason: %s", formatRequest(request), reason);
                     else
-                        spawnRequestData.time = now + VehicleRespawnManager.RespawnSystem.Config
-                            .TIMED_SPAWNS_SPAWN_DELAY;
+                        spawnRequestData.timestamp = now +
+                        VehicleRespawnManager.RespawnSystem.Config.TIMED_SPAWNS_SPAWN_DELAY;
                         Logger:debug("%s Timed Spawn retry after delay. Reason: %s", formatRequest(spawnRequestData),
                             reason);
                     end
@@ -963,66 +1022,94 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessQueues()
     end
 end
 
-Events.OnTick.Add(VehicleRespawnManager.RespawnSystem.SpawnManager.ProcessQueues);
+Events.OnTick.Add(VehicleRespawnManager.RespawnSystem.ProcessQueues);
 
 
 
--- On grid square load, try LocationPendingSpawns
-function VehicleRespawnManager.RespawnSystem.SpawnManager.OnLoadGridsquare(square)
-    local globalModData = VehicleRespawnManager.RespawnSystem.ModDataManager.getModData();
+-- On grid square load, try LocationPendingSpawns with a delay
+function VehicleRespawnManager.RespawnSystem.OnLoadGridsquare(square)
+    local globalModData = VehicleRespawnManager.RespawnSystem.getModData();
     local key = square:getX() .. "_" .. square:getY();
     local spawnRequestData = globalModData.LocationPendingSpawns[key];
     if spawnRequestData then
-        local canSpawn, reason = VehicleRespawnManager.RespawnSystem.SpawnManager.SpawnVehicleAt(spawnRequestData);
-        if canSpawn then
+        if not globalModData.RequestsById[spawnRequestData.id] then
             globalModData.LocationPendingSpawns[key] = nil;
-        else
-            spawnRequestData.attempt = spawnRequestData.attempt + 1;
-            if spawnRequestData.attempt > VehicleRespawnManager.RespawnSystem.Config.MAX_ATTEMPTS_REQ then
-                globalModData.LocationPendingSpawns[key] = nil;
+            return;
+        end
 
-                spawnRequestData.status = Constants.CONFIG.REQUEST_STATUS.FAILED;
-                spawnRequestData.failureReason = "MAX_ATTEMPTS_EXCEEDED";
+        globalModData.LocationPendingSpawns[key] = nil;
 
-                Logger:debug("%s Location Pending Spawn failed. Reason: %s", formatRequest(spawnRequestData),
-                    spawnRequestData.failureReason);
+        local delay = VehicleRespawnManager.RespawnSystem.Config.SQUARE_LOAD_DELAY;
+        local targetTime = getTimestamp() + delay;
+        local requestId = spawnRequestData.id;
+
+        local function processDelayedSpawn()
+            if getTimestamp() < targetTime then return; end
+
+            if not globalModData.RequestsById[requestId] then
+                Events.OnTick.Remove(processDelayedSpawn);
+                return;
+            end
+
+            spawnRequestData.status = Constants.CONFIG.REQUEST_STATUS.PROCESSING;
+            local canSpawn, reason = VehicleRespawnManager.RespawnSystem.SpawnVehicleAt(spawnRequestData);
+
+            if canSpawn then
+                globalModData.RequestsById[requestId] = nil;
+                Logger:debug("%s Location Pending Spawn succeeded after a %sms delay", formatRequest(spawnRequestData),
+                    delay);
             else
-                if reason == "occupied" then
-                    globalModData.LocationPendingSpawns[key] = nil;
+                spawnRequestData.attempt = spawnRequestData.attempt + 1;
+                if spawnRequestData.attempt > VehicleRespawnManager.RespawnSystem.Config.MAX_ATTEMPTS_REQ then
+                    globalModData.RequestsById[requestId] = nil;
 
-                    local request = spawnRequestData;
-                    request.status = VehicleRespawnManager.RespawnSystem.Config.REQUEST_STATUS.PENDING;
-                    request.timestamp = getTimestamp();
+                    spawnRequestData.status = Constants.CONFIG.REQUEST_STATUS.FAILED;
+                    spawnRequestData.failureReason = "MAX_ATTEMPTS_EXCEEDED";
 
-                    table.insert(globalModData.SpawnRequestsQueue, request);
+                    Logger:debug("%s Location Pending Spawn failed after %sms delay. Reason: %s",
+                        formatRequest(spawnRequestData), delay, spawnRequestData.failureReason);
+                else
+                    if reason == "occupied" then
+                        local request = spawnRequestData;
+                        request.status = VehicleRespawnManager.RespawnSystem.Config.REQUEST_STATUS.PENDING;
+                        request.timestamp = getTimestamp();
 
-                    Logger:debug("%s Location Pending Spawn was requeued. Reason: %s", formatRequest(request), reason);
+                        table.insert(globalModData.SpawnRequestsQueue, request);
+
+                        Logger:debug("%s Location Pending Spawn was requeued after a %sms delay. Reason: %s",
+                            formatRequest(request), delay, reason);
+                    elseif reason == "noCell" or reason == "chunkNotLoaded" or reason == "noSquare" then
+                        local key = spawnRequestData.x .. "_" .. spawnRequestData.y;
+                        globalModData.LocationPendingSpawns[key] = spawnRequestData;
+
+                        Logger:debug("%s Location Pending Spawn rescheduled. Reason: %s", formatRequest(spawnRequestData),
+                            reason);
+                    end
                 end
             end
+            Events.OnTick.Remove(processDelayedSpawn);
         end
+        Events.OnTick.Add(processDelayedSpawn);
     end
 end
 
-Events.LoadGridsquare.Add(VehicleRespawnManager.RespawnSystem.SpawnManager.OnLoadGridsquare);
+Events.LoadGridsquare.Add(VehicleRespawnManager.RespawnSystem.OnLoadGridsquare);
 
 
 -----------------------------------------------------
 -- Public API for queueing spawns
 -----------------------------------------------------
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.GenerateRequestId()
-    local globalModData = VehicleRespawnManager.RespawnSystem.ModDataManager.getModData();
+function VehicleRespawnManager.RespawnSystem.GenerateRequestId()
+    local globalModData = VehicleRespawnManager.RespawnSystem.getModData();
     globalModData.LastRequestId = globalModData.LastRequestId + 1;
 
-    local timestamp = tostring(getTimestamp());
-    local counter = string.format("%06d", globalModData.LastRequestId);
-
-    return timestamp .. "_" .. counter;
+    return string.format("%06d", globalModData.LastRequestId);
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.QueueRandomVehicle()
-    local requestId = VehicleRespawnManager.RespawnSystem.SpawnManager.GenerateRequestId();
-    local globalModData = VehicleRespawnManager.RespawnSystem.ModDataManager.getModData();
+function VehicleRespawnManager.RespawnSystem.QueueRandomVehicle()
+    local requestId = VehicleRespawnManager.RespawnSystem.GenerateRequestId();
+    local globalModData = VehicleRespawnManager.RespawnSystem.getModData();
 
     local request = {
         id = requestId,
@@ -1038,9 +1125,9 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.QueueRandomVehicle()
     return requestId;
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.QueueFixedVehicle(scriptName)
-    local requestId = VehicleRespawnManager.RespawnSystem.SpawnManager.GenerateRequestId();
-    local globalModData = VehicleRespawnManager.RespawnSystem.ModDataManager.getModData();
+function VehicleRespawnManager.RespawnSystem.QueueFixedVehicle(scriptName)
+    local requestId = VehicleRespawnManager.RespawnSystem.GenerateRequestId();
+    local globalModData = VehicleRespawnManager.RespawnSystem.getModData();
 
     local request = {
         id = requestId,
@@ -1057,14 +1144,14 @@ function VehicleRespawnManager.RespawnSystem.SpawnManager.QueueFixedVehicle(scri
     return requestId;
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.QueueMultipleRandom(count)
+function VehicleRespawnManager.RespawnSystem.QueueMultipleRandom(count)
     for i = 1, count do
-        VehicleRespawnManager.RespawnSystem.SpawnManager.QueueRandomVehicle();
+        VehicleRespawnManager.RespawnSystem.QueueRandomVehicle();
     end
 end
 
-function VehicleRespawnManager.RespawnSystem.SpawnManager.QueueMultipleFixed(scriptName, count)
+function VehicleRespawnManager.RespawnSystem.QueueMultipleFixed(scriptName, count)
     for i = 1, count do
-        VehicleRespawnManager.RespawnSystem.SpawnManager.QueueFixedVehicle(scriptName);
+        VehicleRespawnManager.RespawnSystem.QueueFixedVehicle(scriptName);
     end
 end

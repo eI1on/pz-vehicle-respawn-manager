@@ -15,7 +15,7 @@ function VehicleRespawnManager.Server.PushUpdateToAll(zones)
     else
         VehicleRespawnManager.Zones = zones;
     end
-    VehicleRespawnManager.RespawnSystem.ZoneManager.initZones();
+    VehicleRespawnManager.RespawnSystem.initZones();
 end
 
 function VehicleRespawnManager.Server.PushUpdateToPlayer(player, zones)
@@ -24,7 +24,7 @@ function VehicleRespawnManager.Server.PushUpdateToPlayer(player, zones)
     else
         VehicleRespawnManager.Zones = zones;
     end
-    VehicleRespawnManager.RespawnSystem.ZoneManager.initZones();
+    VehicleRespawnManager.RespawnSystem.initZones();
 end
 
 --------------------------------------------------
@@ -106,7 +106,7 @@ end
 
 function VehicleRespawnManager.Server.ServerCommands.ExportRespawnSystemData(player, args)
     sendServerCommand("VehicleRespawnManager", "ExportRespawnSystemData",
-        { data = VehicleRespawnManager.RespawnSystem.ModDataManager.getModData() });
+        { data = VehicleRespawnManager.RespawnSystem.getModData() });
 end
 
 function VehicleRespawnManager.Server.ServerCommands.SetLogLevel(player, args)
@@ -121,12 +121,12 @@ function VehicleRespawnManager.Server.ServerCommands.QueueVehicle(player, args)
     local queueType = args.type;
     if queueType == "random" then
         if not args.count then
-            VehicleRespawnManager.RespawnSystem.SpawnManager.QueueRandomVehicle();
+            VehicleRespawnManager.RespawnSystem.QueueRandomVehicle();
         else
             local count = tonumber(args.count);
             if count and count > 0 then
                 for i = 1, count do
-                    VehicleRespawnManager.RespawnSystem.SpawnManager.QueueRandomVehicle();
+                    VehicleRespawnManager.RespawnSystem.QueueRandomVehicle();
                 end
             end
         end
@@ -139,12 +139,12 @@ function VehicleRespawnManager.Server.ServerCommands.QueueVehicle(player, args)
             return;
         end
         if not args.count then
-            VehicleRespawnManager.RespawnSystem.SpawnManager.QueueFixedVehicle(scriptName);
+            VehicleRespawnManager.RespawnSystem.QueueFixedVehicle(scriptName);
         else
             local count = tonumber(args.count);
             if count and count > 0 then
                 for i = 1, count do
-                    VehicleRespawnManager.RespawnSystem.SpawnManager.QueueFixedVehicle(scriptName);
+                    VehicleRespawnManager.RespawnSystem.QueueFixedVehicle(scriptName);
                 end
             end
         end

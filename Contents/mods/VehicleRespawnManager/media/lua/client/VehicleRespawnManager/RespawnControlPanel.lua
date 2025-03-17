@@ -48,6 +48,11 @@ local UI = {
 local font_size, scale = getCore():getOptionFontSize() or 1, { 1, 1.3, 1.65, 1.95, 2.3 };
 RespawnControlPanel.scale = scale[font_size];
 
+local function floorToDecimals(num, decimals)
+    local mult = 10 ^ (decimals or 0);
+    return math.floor(num * mult + 0.5) / mult;
+end
+
 function RespawnControlPanel.openPanel()
     if RespawnControlPanel.instance then
         RespawnControlPanel.instance:close();
@@ -187,10 +192,14 @@ function RespawnControlPanel:setupCoordinateInputs()
     self.coordsErrorLabel:setHeight(getTextManager():getFontHeight(UI.FONTS.SMALL));
     self.coordsErrorLabel.center = true;
 
-    self.x1Label, self.x1Input = self:setupCoordinateField(xBase, self.coordsErrorLabel:getBottom() + halfPadding, getText("IGUI_VRM_X1"), "x1", inputHeight);
-    self.y1Label, self.y1Input = self:setupCoordinateField(self.x1Input:getRight() + halfPadding, self.x1Input:getY(), getText("IGUI_VRM_Y1"), "y1", inputHeight);
-    self.x2Label, self.x2Input = self:setupCoordinateField(xBase, self.x1Input:getBottom() + halfPadding, getText("IGUI_VRM_X2"), "x2", inputHeight);
-    self.y2Label, self.y2Input = self:setupCoordinateField(self.x2Input:getRight() + halfPadding, self.x2Input:getY(), getText("IGUI_VRM_Y2"), "y2", inputHeight);
+    self.x1Label, self.x1Input = self:setupCoordinateField(xBase, self.coordsErrorLabel:getBottom() + halfPadding,
+        getText("IGUI_VRM_X1"), "x1", inputHeight);
+    self.y1Label, self.y1Input = self:setupCoordinateField(self.x1Input:getRight() + halfPadding, self.x1Input:getY(),
+        getText("IGUI_VRM_Y1"), "y1", inputHeight);
+    self.x2Label, self.x2Input = self:setupCoordinateField(xBase, self.x1Input:getBottom() + halfPadding,
+        getText("IGUI_VRM_X2"), "x2", inputHeight);
+    self.y2Label, self.y2Input = self:setupCoordinateField(self.x2Input:getRight() + halfPadding, self.x2Input:getY(),
+        getText("IGUI_VRM_Y2"), "y2", inputHeight);
 
     self.x1Input.tooltip = getText("IGUI_VRM_CoordsInputs_tooltip");
     self.y1Input.tooltip = getText("IGUI_VRM_CoordsInputs_tooltip");
@@ -608,29 +617,39 @@ function RespawnControlPanel:drawVehiclesCategoriesListItem(y, item, alt)
         x = sliderX - (arrowSize * 1.5),
         y = y + (height / 2) - ((sliderHeight * 1.5) / 2),
         w = arrowSize,
-        h = sliderHeight * 1.5
+        h = sliderHeight * 1.5,
+        index = item.index
     };
     local btnRightDim = {
         x = sliderX + sliderWidth + (arrowSize * 0.5),
         y = y + (height / 2) - ((sliderHeight * 1.5) / 2),
         w = arrowSize,
-        h = sliderHeight * 1.5
+        h = sliderHeight * 1.5,
+        index = item.index
     };
 
-    self.btnLeftDim = btnLeftDim;
-    self.btnRightDim = btnRightDim;
+    if not self.itemArrows then self.itemArrows = {} end
+    self.itemArrows[item.index] = {
+        left = btnLeftDim,
+        right = btnRightDim
+    }
 
     local c = UI.COLORS.ARROW;
-    if self.leftPressed then c = UI.COLORS.ARROW_HOVER; end
-    self:drawTextureScaled(UI.ARROWS_TEX.LEFT, btnLeftDim.x, btnLeftDim.y, btnLeftDim.w, btnLeftDim.h, c.a, c.r, c.g, c
-        .b);
+    if self.leftPressed and self.activeArrowIndex == item.index then
+        c = UI.COLORS.ARROW_HOVER;
+    end
+    self:drawTextureScaled(UI.ARROWS_TEX.LEFT, btnLeftDim.x, btnLeftDim.y, btnLeftDim.w, btnLeftDim.h, c.a, c.r, c.g, c.b);
 
-    if self.rightPressed then c = UI.COLORS.ARROW_HOVER; else c = UI.COLORS.ARROW; end
-    self:drawTextureScaled(UI.ARROWS_TEX.RIGHT, btnRightDim.x, btnRightDim.y, btnRightDim.w, btnRightDim.h, c.a, c.r, c
-        .g, c.b);
+    c = UI.COLORS.ARROW;
+    if self.rightPressed and self.activeArrowIndex == item.index then
+        c = UI.COLORS.ARROW_HOVER;
+    else
+        c = UI.COLORS.ARROW;
+    end
+    self:drawTextureScaled(UI.ARROWS_TEX.RIGHT, btnRightDim.x, btnRightDim.y, btnRightDim.w, btnRightDim.h, c.a, c.r, c.g, c.b);
 
-    local rateText = string.format("%d%%", math.floor(value));
-    local rateX = btnRightDim.x + btnRightDim.w + UI.PADDING.SMALL
+    local rateText = string.format("%.1f%%", floorToDecimals(value, 1));
+    local rateX = btnRightDim.x + btnRightDim.w + UI.PADDING.SMALL;
     self:drawText(rateText, rateX, sliderY - (self.fontHgt / 2) + (sliderHeight / 2), UI.COLORS.TEXT.r, UI.COLORS.TEXT.g,
         UI.COLORS.TEXT.b, UI.COLORS.TEXT.a, self.font);
 
@@ -659,20 +678,28 @@ function RespawnControlPanel:onVehiclesCategoriesListMouseDown(x, y)
     if row > #self.items then row = #self.items; end
     if row < 1 then row = 1; end
 
+    if not self.itemArrows then return; end
+    local arrows = self.itemArrows[row];
+    if not arrows then return; end
+
     local item = self.items[row].item;
-    local btnLeftDim = self.btnLeftDim;
-    local btnRightDim = self.btnRightDim;
+    local btnLeftDim = arrows.left;
+    local btnRightDim = arrows.right;
+
+    local stepVal = isShiftKeyDown() and 1 or 0.1;
 
     if x >= btnLeftDim.x and x <= btnLeftDim.x + btnLeftDim.w and y >= btnLeftDim.y and y <= btnLeftDim.y + btnLeftDim.h then
-        item.spawnRate = math.max(0, (item.spawnRate or 0) - 1);
+        item.spawnRate = math.max(0, (item.spawnRate or 0) - stepVal);
         self.leftPressed = true;
+        self.activeArrowIndex = row;
         self.parent:sendSpawnRateUpdate();
         return;
     end
 
     if x >= btnRightDim.x and x <= btnRightDim.x + btnRightDim.w and y >= btnRightDim.y and y <= btnRightDim.y + btnRightDim.h then
-        item.spawnRate = math.min(100, (item.spawnRate or 0) + 1);
+        item.spawnRate = math.min(100, (item.spawnRate or 0) + stepVal);
         self.rightPressed = true;
+        self.activeArrowIndex = row;
         self.parent:sendSpawnRateUpdate();
         return
     end
@@ -727,6 +754,7 @@ end
 function RespawnControlPanel:onVehiclesCategoriesListMouseUp(x, y)
     self.leftPressed = false;
     self.rightPressed = false;
+    self.activeArrowIndex = nil;
 
     if self.draggingSlider then
         self.parent:sendSpawnRateUpdate();
@@ -765,7 +793,7 @@ function RespawnControlPanel:normalizeSpawnRates()
         local item = items[i];
         local rate = item.item.spawnRate or 0;
         local scaledRate = (rate / total) * 100;
-        table.insert(scaledRates, math.floor(scaledRate));
+        table.insert(scaledRates, floorToDecimals(scaledRate, 1));
     end
 
     local adjustedTotal = 0;
@@ -802,7 +830,7 @@ function RespawnControlPanel:sendSpawnRateUpdate()
     for i = 1, #items do
         local item = items[i];
         local key = item.item.key;
-        local spawnRate = math.floor(item.item.spawnRate) or 0;
+        local spawnRate = floorToDecimals(item.item.spawnRate, 1) or 0;
 
         sendClientCommand("VehicleRespawnManager", "EditZoneData",
             {

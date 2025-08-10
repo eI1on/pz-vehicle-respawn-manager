@@ -1,5 +1,5 @@
 local Logger = require("VehicleRespawnManager/Logger");
-local FileUtils = require("ElyonLib/FileUtils");
+local FileUtils = require("ElyonLib/FileUtils/FileUtils");
 
 local ZONE_TEMPLATE = require("VehicleRespawnManager/ZONE_TEMPLATE");
 

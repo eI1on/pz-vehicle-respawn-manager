@@ -1,1 +1,1 @@
-return require("ElyonLib/Logger"):new("Vehicle Respawn Manager");
+return require("ElyonLib/Core/Logger"):new("Vehicle Respawn Manager");

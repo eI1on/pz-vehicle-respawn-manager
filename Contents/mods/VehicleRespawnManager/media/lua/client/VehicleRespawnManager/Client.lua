@@ -1,5 +1,5 @@
 local Logger = require("VehicleRespawnManager/Logger");
-local FileUtils = require("ElyonLib/FileUtils");
+local FileUtils = require("ElyonLib/FileUtils/FileUtils");
 
 local VehicleRespawnManager = require("VehicleRespawnManager/Shared");
 VehicleRespawnManager.Client = {};

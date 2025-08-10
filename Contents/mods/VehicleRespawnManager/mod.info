@@ -1,7 +1,7 @@
-name=Vehicle Respawn Manager [DEV Branch]
+name=[B41] Vehicle Respawn Manager
 poster=poster.png
-id=VehicleRespawnManager_DEV
-description=
+id=VehicleRespawnManager
+description=Take control of where, what, and how vehicles respawn after [b]salvaging[/b] them. Define your own spawn zones, balance vehicle types with category rates, protect safehouses, and keep performance smooth on live servers.
 require=ElyonLib,StarlitLibrary
 tags=Build 41,Misc,Multiplayer,Interface
 versionMin=41.0

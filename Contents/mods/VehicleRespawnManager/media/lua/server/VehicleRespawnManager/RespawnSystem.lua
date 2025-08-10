@@ -382,7 +382,7 @@ function VehicleRespawnManager.RespawnSystem.RecacheCellsForSafehouses(safehouse
         for x = minCellX, maxCellX do
             for y = minCellY, maxCellY do
                 cellX, cellY = tonumber(x), tonumber(y);
-                if cellX and cellY then
+                if cellX and cellY and cellX >= 0 and cellY >= 0 then
                     cachedRow = VehicleRespawnManager.RespawnSystem.State.cachedWorldZonesByCell[cellY];
                     if cachedRow then cachedRow[cellX] = nil; end
                 end

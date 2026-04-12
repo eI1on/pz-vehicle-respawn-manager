@@ -1,7 +1,8 @@
-local Logger = require("VehicleRespawnManager/Logger");
+local AccessLevelUtils = require("ElyonLib/PlayerUtils/AccessLevelUtils")
 local FileUtils = require("ElyonLib/FileUtils/FileUtils");
-
+local Logger = require("VehicleRespawnManager/Logger");
 local VehicleRespawnManager = require("VehicleRespawnManager/Shared");
+
 VehicleRespawnManager.Client = {};
 VehicleRespawnManager.Client.ClientCommands = {};
 
@@ -35,5 +36,17 @@ function VehicleRespawnManager.Client.ClientCommands.onServerCommand(module, com
         VehicleRespawnManager.Client.ClientCommands[command](args);
     end
 end
+
+local doCommand = false;
+local function sendCommand()
+    if doCommand then
+        if AccessLevelUtils.isPlayerAtLeast(getPlayer():getPlayerNum(), "Admin", getPlayer()) then
+            sendClientCommand("VehicleRespawnManager", "LoadZones", {});
+        end
+        Events.OnTick.Remove(sendCommand);
+    end
+    doCommand = true;
+end
+Events.OnTick.Add(sendCommand);
 
 Events.OnServerCommand.Add(VehicleRespawnManager.Client.ClientCommands.onServerCommand);

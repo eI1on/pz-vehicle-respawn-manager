@@ -82,36 +82,19 @@ function RespawnControlPanel.openPanel()
     end
 end
 
-local ISDebugMenu_setupButtons = ISDebugMenu.setupButtons;
----@diagnostic disable-next-line: duplicate-set-field
-function ISDebugMenu:setupButtons()
-    sendClientCommand("VehicleRespawnManager", "LoadZones", {});
-    self:addButtonInfo("Vehicle Respawn Manager", function() RespawnControlPanel.openPanel() end, "MAIN");
-    ISDebugMenu_setupButtons(self);
-end
+local MenuDock = require("ElyonLib/UI/MenuDock/MenuDock")
 
----@diagnostic disable-next-line: duplicate-set-field
-local ISAdminPanelUI_create = ISAdminPanelUI.create;
-function ISAdminPanelUI:create()
-    ISAdminPanelUI_create(self);
-    local fontHeight = getTextManager():getFontHeight(UIFont.Small);
-    local btnWid = 150;
-    local btnHgt = math.max(25, fontHeight + 3 * 2);
-    local btnGapY = 5;
-
-    local lastButton = self.children[self.IDMax - 1];
-    lastButton = lastButton.internal == "CANCEL" and self.children[self.IDMax - 2] or lastButton;
-
-    sendClientCommand("VehicleRespawnManager", "LoadZones", {});
-
-    self.showVehicleRespawnManager = ISButton:new(lastButton.x, lastButton.y + btnHgt + btnGapY, btnWid, btnHgt,
-        "Vehicle Respawn Manager", self, RespawnControlPanel.openPanel);
-    self.showVehicleRespawnManager.internal = "";
-    self.showVehicleRespawnManager:initialise();
-    self.showVehicleRespawnManager:instantiate();
-    self.showVehicleRespawnManager.borderColor = self.buttonBorderColor;
-    self:addChild(self.showVehicleRespawnManager);
-end
+MenuDock.registerButton({
+    id = "vehicle_respawn_manager",
+    title = getText("IGUI_VRM_Title"),
+    icon = "media/ui/ui_icon_vehicle_respawn_manager.png",
+    minimumAccessLevel = "Admin",
+    allowSinglePlayer = true,
+    onClick = function(playerNum, entry)
+        sendClientCommand("VehicleRespawnManager", "LoadZones", {});
+        RespawnControlPanel.openPanel()
+    end,
+})
 
 function RespawnControlPanel:new(x, y, width, height, player)
     local o = ISCollapsableWindowJoypad.new(self, x, y, width, height);
@@ -638,7 +621,8 @@ function RespawnControlPanel:drawVehiclesCategoriesListItem(y, item, alt)
     if self.leftPressed and self.activeArrowIndex == item.index then
         c = UI.COLORS.ARROW_HOVER;
     end
-    self:drawTextureScaled(UI.ARROWS_TEX.LEFT, btnLeftDim.x, btnLeftDim.y, btnLeftDim.w, btnLeftDim.h, c.a, c.r, c.g, c.b);
+    self:drawTextureScaled(UI.ARROWS_TEX.LEFT, btnLeftDim.x, btnLeftDim.y, btnLeftDim.w, btnLeftDim.h, c.a, c.r, c.g, c
+    .b);
 
     c = UI.COLORS.ARROW;
     if self.rightPressed and self.activeArrowIndex == item.index then
@@ -646,7 +630,8 @@ function RespawnControlPanel:drawVehiclesCategoriesListItem(y, item, alt)
     else
         c = UI.COLORS.ARROW;
     end
-    self:drawTextureScaled(UI.ARROWS_TEX.RIGHT, btnRightDim.x, btnRightDim.y, btnRightDim.w, btnRightDim.h, c.a, c.r, c.g, c.b);
+    self:drawTextureScaled(UI.ARROWS_TEX.RIGHT, btnRightDim.x, btnRightDim.y, btnRightDim.w, btnRightDim.h, c.a, c.r, c
+    .g, c.b);
 
     local rateText = string.format("%.1f%%", floorToDecimals(value, 1));
     local rateX = btnRightDim.x + btnRightDim.w + UI.PADDING.SMALL;

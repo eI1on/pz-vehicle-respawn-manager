@@ -5,42 +5,34 @@ local ZONE_TEMPLATE = require("VehicleRespawnManager/ZONE_TEMPLATE");
 
 local VehicleRespawnManager = require("VehicleRespawnManager/Shared");
 local VehicleScriptTextBox = require("VehicleRespawnManager/VehicleScriptTextBox");
+local Theme = require("ElyonLib/UI/Theme/Theme");
 
----@class RespawnControlPanel : ISCollapsableWindowJoypad
 local RespawnControlPanel = ISCollapsableWindowJoypad:derive("RespawnControlPanel");
 
----@type RespawnControlPanel|nil;
 RespawnControlPanel.instance = nil;
+
+local T = Theme.colors
 
 local UI = {
     PADDING = {
-        SMALL = 5,
+        SMALL  = 5,
         MEDIUM = 10,
-        LARGE = 15
-    },
-    COLORS = {
-        TEXT = { r = 0.9, g = 0.9, b = 0.9, a = 0.9 },
-        BORDER = { r = 0.4, g = 0.4, b = 0.4, a = 1 },
-        SELECTED = { r = 0.7, g = 0.35, b = 0.15, a = 0.3 },
-        BACKGROUND = { r = 0.1, g = 0.1, b = 0.1, a = 0.75 },
-
-        ARROW = { r = 0.4, g = 0.4, b = 0.4, a = 1 },
-        ARROW_HOVER = { r = 1.0, g = 1.0, b = 1.0, a = 1.0 }
+        LARGE  = 15
     },
     FONTS = {
-        SMALL = UIFont.Small,
+        SMALL  = UIFont.Small,
         MEDIUM = UIFont.Medium,
-        LARGE = UIFont.Large
+        LARGE  = UIFont.Large
     },
     DIMENSIONS = {
-        MIN_WIDTH = 800,
-        MIN_HEIGHT = 700,
+        MIN_WIDTH     = 800,
+        MIN_HEIGHT    = 700,
         BUTTON_HEIGHT = 20,
-        INPUT_HEIGHT = 20,
-        LIST_HEIGHT = 150
+        INPUT_HEIGHT  = 20,
+        LIST_HEIGHT   = 150
     },
     ARROWS_TEX = {
-        LEFT = getTexture("media/ui/ArrowLeft.png"),
+        LEFT  = getTexture("media/ui/ArrowLeft.png"),
         RIGHT = getTexture("media/ui/ArrowRight.png"),
     }
 }
@@ -72,7 +64,6 @@ function RespawnControlPanel.openPanel()
     local x = math.max(0, math.min(savedPosition.x or (screenWidth - width) / 2, screenWidth - width));
     local y = math.max(0, math.min(savedPosition.y or (screenHeight - height) / 2, screenHeight - height));
 
-    ---@diagnostic disable-next-line: assign-type-mismatch
     RespawnControlPanel.instance = RespawnControlPanel:new(x, y, width, height, playerObj);
     RespawnControlPanel.instance:initialise();
     RespawnControlPanel.instance:addToUIManager();
@@ -100,14 +91,14 @@ function RespawnControlPanel:new(x, y, width, height, player)
     local o = ISCollapsableWindowJoypad.new(self, x, y, width, height);
 
     o:setResizable(true);
-    o.character           = player;
-    o.playerNum           = player and player:getPlayerNum() or -1;
-    o.title               = getText("IGUI_VRM_Title");
-    o.minimumWidth        = 700 * self.scale;
-    o.minimumHeight       = 650;
+    o.character       = player;
+    o.playerNum       = player and player:getPlayerNum() or -1;
+    o.title           = getText("IGUI_VRM_Title");
+    o.minimumWidth    = 700 * self.scale;
+    o.minimumHeight   = 650;
 
-    o.borderColor         = UI.COLORS.BORDER;
-    o.backgroundColor     = UI.COLORS.BACKGROUND;
+    o.borderColor     = Theme.copy(T.border);
+    o.backgroundColor = Theme.copy(T.background);
 
     o.vehicleRespawnZones = VehicleRespawnManager.Shared.RequestZones();
 
@@ -234,7 +225,8 @@ function RespawnControlPanel:setupZoneNameComboBox(th, padding)
         buttonWidth,
         buttonHeight,
         getText("IGUI_VRM_RemoveZone"),
-        self.onRemoveZone
+        self.onRemoveZone,
+        "danger"
     );
     self.removeZoneButton.tooltip = getText("IGUI_VRM_RemoveZone_tooltip");
 end
@@ -340,7 +332,7 @@ function RespawnControlPanel:render()
     self:drawRectBorder(10, self.maxVehiclesPerZoneLabel:getBottom() + 3 * 10,
         self.spawnVehicleScriptLabel:getRight() + 10,
         (self.spawnManualVehicleButton:getBottom() + 10) - (self.maxVehiclesPerZoneLabel:getBottom() + 3 * 10),
-        0.5, 1.0, 1.0, 1.0
+        0.5, T.focus.r, T.focus.g, T.focus.b
     );
 
     ISCollapsableWindowJoypad.render(self);
@@ -573,15 +565,13 @@ function RespawnControlPanel:drawVehiclesCategoriesListItem(y, item, alt)
     local width = self:getWidth();
 
     if self.selected == item.index then
-        self:drawRect(0, y, width, height - 1, 0.3, UI.COLORS.SELECTED.r, UI.COLORS.SELECTED.g, UI.COLORS.SELECTED.b);
+        self:drawRect(0, y, width, height - 1, 0.3, T.selected.r, T.selected.g, T.selected.b);
     end
 
-    self:drawRectBorder(0, y, width, height, UI.COLORS.BORDER.a, UI.COLORS.BORDER.r, UI.COLORS.BORDER.g,
-        UI.COLORS.BORDER.b);
+    self:drawRectBorder(0, y, width, height, Theme.d(T.border));
 
     local textY = y + (height - self.fontHgt) / 2;
-    self:drawText(item.text, UI.PADDING.MEDIUM, textY, UI.COLORS.TEXT.r, UI.COLORS.TEXT.g, UI.COLORS.TEXT.b,
-        UI.COLORS.TEXT.a, self.font);
+    self:drawText(item.text, UI.PADDING.MEDIUM, textY, T.textMuted.r, T.textMuted.g, T.textMuted.b, T.textMuted.a, self.font);
 
     local sliderX = width / 2;
     local sliderWidth = width / 3;
@@ -592,8 +582,7 @@ function RespawnControlPanel:drawVehiclesCategoriesListItem(y, item, alt)
     self:drawRect(sliderX, sliderY, sliderWidth, sliderHeight, 0.4, 0.3, 0.3, 0.3);
 
     local handleX = sliderX + (sliderWidth * (value / 100)) - 5;
-    self:drawRect(handleX, sliderY - 2, 10 * self.parent.scale, sliderHeight + 4, 1, UI.COLORS.BORDER.r,
-        UI.COLORS.BORDER.g, UI.COLORS.BORDER.b);
+    self:drawRect(handleX, sliderY - 2, 10 * self.parent.scale, sliderHeight + 4, Theme.d(T.border));
 
     local arrowSize = self.fontHgt;
     local btnLeftDim = {
@@ -617,26 +606,21 @@ function RespawnControlPanel:drawVehiclesCategoriesListItem(y, item, alt)
         right = btnRightDim
     }
 
-    local c = UI.COLORS.ARROW;
+    local c = T.border;
     if self.leftPressed and self.activeArrowIndex == item.index then
-        c = UI.COLORS.ARROW_HOVER;
+        c = T.text;
     end
-    self:drawTextureScaled(UI.ARROWS_TEX.LEFT, btnLeftDim.x, btnLeftDim.y, btnLeftDim.w, btnLeftDim.h, c.a, c.r, c.g, c
-    .b);
+    self:drawTextureScaled(UI.ARROWS_TEX.LEFT, btnLeftDim.x, btnLeftDim.y, btnLeftDim.w, btnLeftDim.h, c.a, c.r, c.g, c.b);
 
-    c = UI.COLORS.ARROW;
+    c = T.border;
     if self.rightPressed and self.activeArrowIndex == item.index then
-        c = UI.COLORS.ARROW_HOVER;
-    else
-        c = UI.COLORS.ARROW;
+        c = T.text;
     end
-    self:drawTextureScaled(UI.ARROWS_TEX.RIGHT, btnRightDim.x, btnRightDim.y, btnRightDim.w, btnRightDim.h, c.a, c.r, c
-    .g, c.b);
+    self:drawTextureScaled(UI.ARROWS_TEX.RIGHT, btnRightDim.x, btnRightDim.y, btnRightDim.w, btnRightDim.h, c.a, c.r, c.g, c.b);
 
     local rateText = string.format("%.1f%%", floorToDecimals(value, 1));
     local rateX = btnRightDim.x + btnRightDim.w + UI.PADDING.SMALL;
-    self:drawText(rateText, rateX, sliderY - (self.fontHgt / 2) + (sliderHeight / 2), UI.COLORS.TEXT.r, UI.COLORS.TEXT.g,
-        UI.COLORS.TEXT.b, UI.COLORS.TEXT.a, self.font);
+    self:drawText(rateText, rateX, sliderY - (self.fontHgt / 2) + (sliderHeight / 2), T.textMuted.r, T.textMuted.g, T.textMuted.b, T.textMuted.a, self.font);
 
     return y + height;
 end
@@ -645,12 +629,11 @@ function RespawnControlPanel:drawBlacklistedVehiclesListItem(y, item, alt)
     self:setStencilRect(0, 0, self.width, self.height);
     if not item.height then item.height = self.itemheight; end
     if self.selected == item.index then
-        self:drawRect(0, (y), self:getWidth(), item.height - 1, 0.3, 0.7, 0.35, 0.15);
+        self:drawRect(0, (y), self:getWidth(), item.height - 1, 0.3, T.warning.r, T.warning.g, T.warning.b);
     end
-    self:drawRectBorder(0, (y), self:getWidth(), item.height, 0.5, self.borderColor.r, self.borderColor.g,
-        self.borderColor.b);
+    self:drawRectBorder(0, (y), self:getWidth(), item.height, 0.5, T.border.r, T.border.g, T.border.b);
     local itemPadY = self.itemPadY or (item.height - self.fontHgt) / 2;
-    self:drawText(item.text, 15, (y) + itemPadY, 0.9, 0.9, 0.9, 0.9, self.font);
+    self:drawText(item.text, 15, (y) + itemPadY, T.text.r, T.text.g, T.text.b, 0.9, self.font);
     y = y + item.height;
     self:clearStencilRect();
     return y;
@@ -722,8 +705,6 @@ function RespawnControlPanel:onVehiclesCategoriesListmousedown(target, item)
 end
 
 function RespawnControlPanel:onVehiclesCategoriesListMouseMove(dx, dy)
-    -- self.parent:normalizeSpawnRates();
-
     if self.draggingSlider then
         local slider = self.draggingSlider;
         local mouseX = self:getMouseX();
@@ -778,7 +759,7 @@ function RespawnControlPanel:normalizeSpawnRates()
         local item = items[i];
         local rate = item.item.spawnRate or 0;
         local scaledRate = (rate / total) * 100;
-        table.insert(scaledRates, floorToDecimals(scaledRate, 1));
+        scaledRates[#scaledRates + 1] = floorToDecimals(scaledRate, 1);
     end
 
     local adjustedTotal = 0;
@@ -829,7 +810,7 @@ end
 
 function RespawnControlPanel:createLabel(x, y, text)
     local fontHeight = getTextManager():getFontHeight(UI.FONTS.MEDIUM);
-    local label = ISLabel:new(x, y, fontHeight, text, 1, 1, 1, 1, UI.FONTS.MEDIUM, true);
+    local label = ISLabel:new(x, y, fontHeight, text, T.text.r, T.text.g, T.text.b, T.text.a, UI.FONTS.MEDIUM, true);
     label:initialise();
     label:instantiate();
     label.font = UI.FONTS.MEDIUM;
@@ -843,18 +824,17 @@ function RespawnControlPanel:createComboBox(x, y, widthRatio)
     local dropdown = ISComboBox:new(x, y, width, height, self, nil);
     dropdown:initialise();
     dropdown:instantiate();
-    dropdown.backgroundColor = UI.COLORS.BACKGROUND;
-    dropdown.borderColor = UI.COLORS.BORDER;
+    Theme.applyComboStyle(dropdown);
     self:addChild(dropdown);
     return dropdown;
 end
 
-function RespawnControlPanel:createButton(x, y, width, height, text, onClick)
+function RespawnControlPanel:createButton(x, y, width, height, text, onClick, variant)
     local button = ISButton:new(x, y, width, height, text, self, onClick);
     button:initialise();
     button:instantiate();
-    button.backgroundColor = UI.COLORS.BACKGROUND;
     button.font = UI.FONTS.SMALL;
+    Theme.applyButtonStyle(button, variant);
     self:addChild(button);
     return button;
 end
@@ -866,8 +846,7 @@ function RespawnControlPanel:createTickBox(x, y, options)
     end
     tickBox:setFont(UI.FONTS.MEDIUM);
     tickBox:setWidthToFit();
-    tickBox.backgroundColor = UI.COLORS.BACKGROUND;
-    tickBox.borderColor = UI.COLORS.BORDER;
+    Theme.applyTickBoxStyle(tickBox);
     self:addChild(tickBox);
     return tickBox;
 end
@@ -877,13 +856,12 @@ function RespawnControlPanel:createScrollingListBox(x, y, width, height)
     listBox:initialise();
     listBox:instantiate();
     listBox.joypadParent = self;
-    listBox.drawBorder = true;
-    listBox.borderColor = UI.COLORS.BORDER;
-    listBox.backgroundColor = UI.COLORS.BACKGROUND;
+    Theme.applyListStyle(listBox);
+    listBox.drawBorder  = true;
     listBox.itemPadding = UI.PADDING.SMALL;
-    listBox.font = UI.FONTS.SMALL;
-    listBox.itemheight = getTextManager():getFontHeight(UI.FONTS.SMALL) + UI.PADDING.MEDIUM;
-    listBox.mainUI = self;
+    listBox.font        = UI.FONTS.SMALL;
+    listBox.itemheight  = getTextManager():getFontHeight(UI.FONTS.SMALL) + UI.PADDING.MEDIUM;
+    listBox.mainUI      = self;
     self:addChild(listBox);
     return listBox;
 end
@@ -894,8 +872,7 @@ function RespawnControlPanel:createTextInput(x, y)
     local textBox = ISTextEntryBox:new("", x, y, width, height);
     textBox:initialise();
     textBox:instantiate();
-    textBox.backgroundColor = UI.COLORS.BACKGROUND;
-    textBox.borderColor = UI.COLORS.BORDER;
+    Theme.applyFieldStyle(textBox);
     textBox.font = UI.FONTS.SMALL;
     self:addChild(textBox);
     return textBox;
@@ -913,7 +890,7 @@ function RespawnControlPanel:addVehicleCategoryButtons()
 
     self.removeCategoryButton = self:createButton(self.addCategoryButton:getRight() + 10,
         self.vehiclesCategoriesList:getBottom() + 10, buttonWidth, buttonHeight, getText("IGUI_VRM_RemoveCategory"),
-        self.onRemoveCategory
+        self.onRemoveCategory, "danger"
     );
     self.removeCategoryButton.tooltip = getText("IGUI_VRM_RemoveCategory_tooltip");
 end
@@ -937,7 +914,7 @@ function RespawnControlPanel:addVehicleAssignmentButtons()
 
     self.removeVehicleButton = self:createButton(self.addVehicleButton:getRight() + padding,
         self.vehiclesAssignedList:getBottom() + padding, buttonWidth, buttonHeight, getText("IGUI_VRM_RemoveVehicle"),
-        self.onRemoveVehicle
+        self.onRemoveVehicle, "danger"
     );
     self.removeVehicleButton.tooltip = getText("IGUI_VRM_RemoveVehicle_tooltip");
 end
@@ -959,7 +936,7 @@ function RespawnControlPanel:addBlacklistedVehiclesButtons()
 
     self.removeBlacklistVehicleButton = self:createButton(self.addBlacklistVehicleButton:getRight() + padding,
         self.blacklistedVehiclesList:getBottom() + padding, buttonWidth, buttonHeight,
-        getText("IGUI_VRM_RemoveBlacklist"), self.onRemoveBlacklistVehicle);
+        getText("IGUI_VRM_RemoveBlacklist"), self.onRemoveBlacklistVehicle, "danger");
     self.removeBlacklistVehicleButton.tooltip = getText("IGUI_VRM_RemoveBlacklist_tooltip");
 end
 
@@ -977,7 +954,7 @@ function RespawnControlPanel:addDefaultCategoryOptions()
 
     self.setDefaultCategoryButton = self:createButton(padding,
         self.defaultCatUnassignedVehiclesTickBox:getBottom() + padding, buttonWidth, buttonHeight,
-        getText("IGUI_VRM_SetDefaultCat"), self.onSetDefaultCategory
+        getText("IGUI_VRM_SetDefaultCat"), self.onSetDefaultCategory, "primary"
     );
     self.setDefaultCategoryButton.tooltip = getText("IGUI_VRM_SetDefaultCat_tooltip");
 
@@ -1014,7 +991,7 @@ function RespawnControlPanel:addManualVehicleSpawn()
     self.vehicleSpawnMethodRadioBttn = ISRadioButtons:new(3 * padding,
         self.vehicleSpawnMethodLabel:getBottom() + padding / 2,
         self.vehicleSpawnMethodLabel:getWidth(), 20, self, self.onChangeVehicleSpawnMethod);
-    self.vehicleSpawnMethodRadioBttn.choicesColor = { r = 1, g = 1, b = 1, a = 1 };
+    self.vehicleSpawnMethodRadioBttn.choicesColor = Theme.copy(T.text);
     self.vehicleSpawnMethodRadioBttn:initialise();
     self.vehicleSpawnMethodRadioBttn:instantiate();
     self.vehicleSpawnMethodRadioBttn.autoWidth = true;
@@ -1075,7 +1052,7 @@ function RespawnControlPanel:addManualVehicleSpawn()
 
     self.spawnManualVehicleButton = self:createButton(2 * padding,
         self.vehicleSpawnMethodRadioBttn:getBottom() + padding, self.vehiclesCategoriesList:getWidth() / 4, buttonHeight,
-        getText("IGUI_VRM_SpawnVehicle"), self.onSpawnVehicles
+        getText("IGUI_VRM_SpawnVehicle"), self.onSpawnVehicles, "primary"
     );
 end
 
@@ -1135,7 +1112,6 @@ end
 
 function RespawnControlPanel:updateHeaderLayout(padding, width)
     local buttonWidth = (self:getWidth() / 3 - padding) / 2;
-    local buttonHeight = UI.DIMENSIONS.BUTTON_HEIGHT * self.scale;
 
     self.zoneNameComboBox:setWidth(width * 0.375);
 
@@ -1203,20 +1179,22 @@ function RespawnControlPanel:updateCoordinateLayout()
     local padding = UI.PADDING.SMALL;
     local halfPadding = padding / 2;
 
-    for _, element in ipairs({
+    local xPairs = {
         { self.x1Label, self.x1Input },
         { self.x2Label, self.x2Input }
-    }) do
-        element[1]:setX(self.exportButton:getX());
-        element[2]:setX(element[1]:getRight() + halfPadding);
+    }
+    for i = 1, #xPairs do
+        xPairs[i][1]:setX(self.exportButton:getX());
+        xPairs[i][2]:setX(xPairs[i][1]:getRight() + halfPadding);
     end
 
-    for _, element in ipairs({
+    local yPairs = {
         { self.y1Label, self.y1Input },
         { self.y2Label, self.y2Input }
-    }) do
-        element[1]:setX(self.x1Input:getRight() + halfPadding);
-        element[2]:setX(element[1]:getRight() + halfPadding);
+    }
+    for i = 1, #yPairs do
+        yPairs[i][1]:setX(self.x1Input:getRight() + halfPadding);
+        yPairs[i][2]:setX(yPairs[i][1]:getRight() + halfPadding);
     end
 end
 
@@ -1348,11 +1326,6 @@ function RespawnControlPanel:validateCoords(zone)
         self.coordsErrorLabel:setName("");
         return;
     end
-
-    -- Conditions:
-    -- West corner: (x1, y1) should have a lower y (further west) and lower x
-    -- South corner: (x2, y2) should have a larger y (further south) and larger x
-    -- So we want: x1 < x2 and y1 < y2
 
     if x1 < x2 and y1 < y2 then
         local selectedZoneIdx = self:getSelectedZoneZoneIdx();
@@ -1520,7 +1493,6 @@ function RespawnControlPanel:onAddCategory(target)
         spawnRate = 0
     });
 
-    -- self:normalizeSpawnRates();
     self:sendSpawnRateUpdate();
 
     local selectedZoneIdx = self:getSelectedZoneZoneIdx();
@@ -1564,7 +1536,7 @@ function RespawnControlPanel:onRemoveCategory()
     for i = 1, #self.vehiclesCategoriesList.items do
         local item = self.vehiclesCategoriesList.items[i]
         item.item.key = tostring(i);
-        table.insert(updatedList, item);
+        updatedList[#updatedList + 1] = item;
     end
     self.vehiclesCategoriesList.items = updatedList;
 
@@ -1736,8 +1708,6 @@ function RespawnControlPanel:onAddVehicle(target, listType)
             self.removeVehicleButton:setEnable(false);
         end
     end
-
-    -- self.refresh = 3;
 end
 
 function RespawnControlPanel:onRemoveVehicle()
@@ -1770,8 +1740,6 @@ function RespawnControlPanel:onRemoveVehicle()
             newValue = vehiclesTable
         }
     );
-
-    -- self.refresh = 3;
 end
 
 function RespawnControlPanel:onAddBlacklistVehicleModal()
@@ -1825,8 +1793,6 @@ function RespawnControlPanel:onRemoveBlacklistVehicle()
             newValue = vehiclesTable
         }
     );
-
-    -- self.refresh = 3;
 end
 
 return RespawnControlPanel

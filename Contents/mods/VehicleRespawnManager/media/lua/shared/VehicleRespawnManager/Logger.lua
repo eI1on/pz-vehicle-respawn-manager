@@ -1,1 +1,2 @@
-return require("ElyonLib/Core/Logger"):new("Vehicle Respawn Manager");
+local Logger = require("ElyonLib/Core/Logger")
+return Logger:new("Vehicle Respawn Manager")

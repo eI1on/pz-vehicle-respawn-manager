@@ -1,6 +1,9 @@
 local VehicleRespawnManager = require("VehicleRespawnManager/Shared");
+local Theme = require("ElyonLib/UI/Theme/Theme");
 
 local VehicleScriptTextBox = ISPanelJoypad:derive("VehicleScriptTextBox");
+
+local T = Theme.colors
 
 local FONT_HGT_SMALL = getTextManager():getFontHeight(UIFont.Small);
 local FONT_HGT_MEDIUM = getTextManager():getFontHeight(UIFont.Medium);
@@ -20,7 +23,7 @@ function VehicleScriptTextBox:initialise()
     self.addBttn.internal = "ADD";
     self.addBttn:initialise();
     self.addBttn:instantiate();
-    self.addBttn.borderColor = { r = 1, g = 1, b = 1, a = 0.1 };
+    Theme.applyButtonStyle(self.addBttn, "primary");
     self:addChild(self.addBttn);
 
     self.cancelBttn = ISButton:new((self:getWidth() / 2) + 5, self:getHeight() - padBottom - buttonHgt, buttonWid, buttonHgt,
@@ -28,7 +31,7 @@ function VehicleScriptTextBox:initialise()
     self.cancelBttn.internal = "CANCEL";
     self.cancelBttn:initialise();
     self.cancelBttn:instantiate();
-    self.cancelBttn.borderColor = { r = 1, g = 1, b = 1, a = 0.1 };
+    Theme.applyButtonStyle(self.cancelBttn);
     self:addChild(self.cancelBttn);
 
     self.fontHgt = FONT_HGT_MEDIUM;
@@ -43,6 +46,7 @@ function VehicleScriptTextBox:initialise()
         self.entry:setEditable(true);
         self.entry:setHeight(20);
         self.entry:setWidth(self:getWidth() - 40);
+        Theme.applyComboStyle(self.entry);
         self:addChild(self.entry);
 
         local vehicleScripts = VehicleRespawnManager.Shared.VehicleScripts;
@@ -62,6 +66,7 @@ function VehicleScriptTextBox:initialise()
         self.entry:instantiate();
         self.entry:setMaxLines(self.maxLines);
         self.entry:setMultipleLine(self.multipleLine);
+        Theme.applyFieldStyle(self.entry);
         self:addChild(self.entry);
     end
 end
@@ -78,11 +83,7 @@ end
 
 function VehicleScriptTextBox:setSingleVehicleMode(mode)
     self.singleVehicleMode = mode;
-    if mode then
-        self:initialise();
-    else
-        self:initialise();
-    end
+    self:initialise();
 end
 
 function VehicleScriptTextBox:setCheckVehicleScripts(mode)
@@ -164,11 +165,11 @@ function VehicleScriptTextBox:prerender()
         self.borderColor.b);
 
     local fontHgt = getTextManager():getFontFromEnum(UIFont.Small):getLineHeight();
-    self:drawTextCentre(self.text, self:getWidth() / 2, self.entry:getY() - 8 - fontHgt, 1, 1, 1, 1, UIFont.Small);
+    self:drawTextCentre(self.text, self:getWidth() / 2, self.entry:getY() - 8 - fontHgt, T.text.r, T.text.g, T.text.b, T.text.a, UIFont.Small);
 
     if self.showError then
-        local fontHgt = getTextManager():getFontFromEnum(UIFont.Small):getLineHeight();
-        self:drawTextCentre(self.errorMsg, self:getWidth() / 2, self.entry:getY() + 50 - fontHgt, 1, 0, 0, 1,
+        local fontHgt2 = getTextManager():getFontFromEnum(UIFont.Small):getLineHeight();
+        self:drawTextCentre(self.errorMsg, self:getWidth() / 2, self.entry:getY() + 50 - fontHgt2, T.danger.r, T.danger.g, T.danger.b, 1,
             UIFont.Small);
     end
 
@@ -344,8 +345,8 @@ function VehicleScriptTextBox:new(x, y, width, height, text, defaultEntryText, t
         o:setX(o.x);
     end
     o.name = nil;
-    o.backgroundColor = { r = 0.1, g = 0.1, b = 0.1, a = 0.75 };
-    o.borderColor = { r = 0.4, g = 0.4, b = 0.4, a = 1 };
+    o.backgroundColor = Theme.copy(T.background);
+    o.borderColor = Theme.copy(T.border);
     o.width = width;
     local txtWidth = getTextManager():MeasureStringX(UIFont.Small, text) + 10;
     if width < txtWidth then

@@ -1,25 +1,29 @@
 {
     "Lua.workspace.library": [
         "${addons}/umbrella/module/library",
-        "C:/Users/geote/ZomboidDEV/Workshop/pz-elyonlib-b41",
+        "${workspaceFolder}/../pz-elyonlib-b41",
         "D:/SteamLibrary/steamapps/workshop/content/108600/3378285185/mods/StarlitLibrary"
     ],
     "Lua.runtime.version": "Lua 5.1",
     "Lua.runtime.path": [
         "?.lua",
         "?/init.lua",
+        "shared/?.lua",
+        "client/?.lua",
         "server/?.lua"
     ],
     "Lua.completion.requireSeparator": "/",
-    "Lua.workspace.preloadFileSize": 800,
+    "Lua.workspace.preloadFileSize": 1500,
+    "Lua.workspace.checkThirdParty": false,
     "Lua.runtime.builtin": {
         "debug": "disable",
         "io": "disable",
         "package": "disable"
     },
-    "Lua.workspace.checkThirdParty": false,
-    "Lua.diagnostics.globals": [
-        "require",
-        "Calendar"
-    ],
+    "Lua.diagnostics.globals": ["require", "Calendar"],
+    "Lua.diagnostics.disable": ["lowercase-global"],
+    "[lua]": {
+        "editor.defaultFormatter": "JohnnyMorganz.stylua",
+        "editor.formatOnSave": true
+    }
 }
